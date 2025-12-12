@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { campaignService } from '../services';
-import { Campaign, CampaignStatus } from '../types';
+import { Campaign } from '../types';
 import { useRealtimeQuery } from './useRealtimeQuery';
 
 // --- Data Hook (React Query + Realtime) ---
@@ -97,10 +97,6 @@ export const useCampaignsController = (initialData?: Campaign[]) => {
   const handleDelete = (id: string) => {
     // Deletar diretamente sem confirmação (pode ser desfeito clonando)
     deleteCampaign(id);
-  };
-
-  const handleDuplicate = (id: string) => {
-    duplicateCampaign(id);
   };
 
   const handleRefresh = () => {
