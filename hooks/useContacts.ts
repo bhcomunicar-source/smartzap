@@ -31,6 +31,27 @@ const sanitizeCustomFieldsForUpdate = (fields?: Record<string, any>) => {
   return out;
 };
 
+const mapContactsRowToContact = (row: any): Contact => {
+  const createdAt = row?.created_at ?? row?.createdAt ?? new Date().toISOString();
+  const updatedAt = row?.updated_at ?? row?.updatedAt ?? null;
+  const lastActive = updatedAt
+    ? new Date(updatedAt).toLocaleDateString()
+    : (createdAt ? new Date(createdAt).toLocaleDateString() : '-');
+
+  return {
+    id: String(row?.id ?? ''),
+    name: row?.name ?? '',
+    phone: row?.phone ?? '',
+    email: row?.email ?? null,
+    status: (row?.status as ContactStatus) || ContactStatus.OPT_IN,
+    tags: row?.tags || [],
+    lastActive,
+    createdAt,
+    updatedAt: updatedAt ?? undefined,
+    custom_fields: row?.custom_fields ?? row?.customFields ?? {},
+  };
+};
+
 export const useContactsController = () => {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -105,8 +126,56 @@ export const useContactsController = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'contacts' },
-        () => {
-          // Invalidate queries when any change happens
+        (payload: any) => {
+          const eventType = payload?.eventType ?? payload?.type;
+          const newRow = payload?.new ?? null;
+          const oldRow = payload?.old ?? null;
+
+          if (eventType === 'DELETE') {
+            const id = oldRow?.id;
+            if (id) {
+              queryClient.setQueryData<Contact[]>(['contacts'], (current) => {
+                if (!current) return current;
+                return current.filter((c) => c.id !== id);
+              });
+              queryClient.removeQueries({ queryKey: ['contact', id], exact: true });
+            }
+            // Stats: melhor invalidar (depende do backend e filtros)
+            queryClient.invalidateQueries({ queryKey: ['contactStats'] });
+            return;
+          }
+
+          if (eventType === 'INSERT' || eventType === 'UPDATE') {
+            if (!newRow?.id) {
+              // Payload inesperado: fallback para consistência.
+              queryClient.invalidateQueries({ queryKey: ['contacts'] });
+              queryClient.invalidateQueries({ queryKey: ['contactStats'] });
+              return;
+            }
+
+            const incoming = mapContactsRowToContact(newRow);
+
+            queryClient.setQueryData<Contact[]>(['contacts'], (current) => {
+              if (!current) return current;
+              const idx = current.findIndex((c) => c.id === incoming.id);
+              if (idx >= 0) {
+                const next = [...current];
+                next[idx] = incoming;
+                return next;
+              }
+              // Mantém o comportamento do GET (created_at desc): inserções novas entram no topo.
+              return [incoming, ...current];
+            });
+
+            // Se alguma tela tiver cache do detalhe, atualiza também.
+            queryClient.setQueryData(['contact', incoming.id], incoming);
+
+            // Stats: invalidar é suficiente e barato.
+            queryClient.invalidateQueries({ queryKey: ['contactStats'] });
+            return;
+          }
+
+          // Outros eventos (ou eventType inesperado)
           queryClient.invalidateQueries({ queryKey: ['contacts'] });
           queryClient.invalidateQueries({ queryKey: ['contactStats'] });
         }

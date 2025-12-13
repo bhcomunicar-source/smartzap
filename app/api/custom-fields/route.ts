@@ -21,7 +21,14 @@ export async function GET(request: Request) {
 
         const fields = await customFieldDefDb.getAll(entityType)
 
-        return NextResponse.json(fields)
+        return NextResponse.json(fields, {
+            headers: {
+                // Dados dinâmicos: cache compartilhado pode causar estado “fantasma” pós CRUD.
+                'Cache-Control': 'private, no-store, no-cache, must-revalidate, max-age=0',
+                Pragma: 'no-cache',
+                Expires: '0'
+            }
+        })
     } catch (error: any) {
         console.error('Failed to fetch custom fields:', error)
         return NextResponse.json(

@@ -6,7 +6,7 @@ import { getUserFriendlyMessage } from '@/lib/whatsapp-errors'
 import { buildMetaTemplatePayload, precheckContactForTemplate } from '@/lib/whatsapp/template-contract'
 
 interface Contact {
-  contactId?: string
+  contactId: string
   phone: string
   name: string
   custom_fields?: Record<string, unknown>
@@ -31,18 +31,26 @@ interface CampaignWorkflowInput {
   isResend?: boolean
 }
 
-async function claimPendingForSend(campaignId: string, phone: string): Promise<boolean> {
+async function claimPendingForSend(
+  campaignId: string,
+  identifiers: { contactId: string; phone: string }
+): Promise<boolean> {
   const now = new Date().toISOString()
-  const { data, error } = await supabase
+  const query = supabase
     .from('campaign_contacts')
     .update({ status: 'sending', sending_at: now })
     .eq('campaign_id', campaignId)
-    .eq('phone', phone)
     .eq('status', 'pending')
+    .eq('contact_id', identifiers.contactId)
     .select('id')
 
+  const { data, error } = await query
+
   if (error) {
-    console.warn(`[Workflow] Falha ao claimar contato ${phone} (seguindo sem enviar):`, error)
+    console.warn(
+      `[Workflow] Falha ao claimar contato ${identifiers.phone} (seguindo sem enviar):`,
+      error
+    )
     return false
   }
   return Array.isArray(data) && data.length > 0
@@ -68,7 +76,7 @@ function buildBodyParameters(contactName: string, templateVariables: string[] = 
 // Atualiza status do contato no banco (Supabase)
 async function updateContactStatus(
   campaignId: string,
-  phone: string,
+  identifiers: { contactId: string; phone: string },
   status: 'sent' | 'failed' | 'skipped',
   opts?: { messageId?: string; error?: string; skipCode?: string; skipReason?: string }
 ) {
@@ -100,13 +108,15 @@ async function updateContactStatus(
       update.message_id = null
     }
 
-    await supabase
+    const query = supabase
       .from('campaign_contacts')
       .update(update)
       .eq('campaign_id', campaignId)
-      .eq('phone', phone)
+      .eq('contact_id', identifiers.contactId)
+
+    await query
   } catch (e) {
-    console.error(`Failed to update contact status: ${phone}`, e)
+    console.error(`Failed to update contact status: ${identifiers.phone}`, e)
   }
 }
 
@@ -115,6 +125,16 @@ async function updateContactStatus(
 export const { POST } = serve<CampaignWorkflowInput>(
   async (context) => {
     const { campaignId, templateName, contacts, templateVariables, phoneNumberId, accessToken, templateSnapshot } = context.requestPayload
+
+    // HARDENING: workflow é estritamente baseado em contact_id.
+    // Se vier algum contato sem contactId, é bug no dispatch/resend e devemos falhar cedo.
+    const missingContactIds = (contacts || []).filter((c) => !c.contactId || String(c.contactId).trim().length === 0)
+    if (missingContactIds.length > 0) {
+      const sample = missingContactIds.slice(0, 10).map((c) => ({ phone: c.phone, name: c.name || '' }))
+      throw new Error(
+        `[Workflow] Payload inválido: ${missingContactIds.length} contato(s) sem contactId. Exemplo: ${JSON.stringify(sample)}`
+      )
+    }
 
     // Step 1: Mark campaign as SENDING in Supabase
     await context.run('init-campaign', async () => {
@@ -167,12 +187,13 @@ export const { POST } = serve<CampaignWorkflowInput>(
             }
 
             // Idempotência (at-least-once): se já foi processado, não reenviar
-            const { data: existingRow } = await supabase
+            const existingQuery = supabase
               .from('campaign_contacts')
               .select('status, message_id')
               .eq('campaign_id', campaignId)
-              .eq('phone', contact.phone)
-              .single()
+              .eq('contact_id', contact.contactId as string)
+
+            const { data: existingRow } = await existingQuery.single()
 
             const existingStatus = (existingRow as any)?.status as string | undefined
             if (existingStatus && ['sent', 'delivered', 'read', 'failed', 'skipped'].includes(existingStatus)) {
@@ -198,7 +219,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
             )
 
             if (!precheck.ok) {
-              await updateContactStatus(campaignId, contact.phone, 'skipped', {
+              await updateContactStatus(campaignId, { contactId: contact.contactId as string, phone: contact.phone }, 'skipped', {
                 skipCode: precheck.skipCode,
                 skipReason: precheck.reason,
               })
@@ -208,7 +229,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
             }
 
             // Claim idempotente: só 1 executor envia por contato
-            const claimed = await claimPendingForSend(campaignId, contact.phone)
+            const claimed = await claimPendingForSend(campaignId, { contactId: contact.contactId as string, phone: contact.phone })
             if (!claimed) {
               console.log(`↩️ Idempotência: ${contact.phone} não estava pending (ou já claimado), pulando envio.`)
               continue
@@ -242,7 +263,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
               const messageId = data.messages[0].id
 
               // Update contact status in Supabase (stores message_id for webhook lookup)
-              await updateContactStatus(campaignId, contact.phone, 'sent', { messageId })
+              await updateContactStatus(campaignId, { contactId: contact.contactId as string, phone: contact.phone }, 'sent', { messageId })
 
               sentCount++
               console.log(`✅ Sent to ${contact.phone}`)
@@ -254,7 +275,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
               const errorWithCode = `(#${errorCode}) ${translatedError}`
 
               // Update contact status in Supabase
-              await updateContactStatus(campaignId, contact.phone, 'failed', { error: errorWithCode })
+              await updateContactStatus(campaignId, { contactId: contact.contactId as string, phone: contact.phone }, 'failed', { error: errorWithCode })
 
               failedCount++
               console.log(`❌ Failed ${contact.phone}: ${errorWithCode}`)
@@ -266,7 +287,8 @@ export const { POST } = serve<CampaignWorkflowInput>(
           } catch (error) {
             // Update contact status in Supabase
             const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido'
-            await updateContactStatus(campaignId, contact.phone, 'failed', { error: errorMsg })
+            // Neste ponto, contactId é obrigatório (validado no início)
+            await updateContactStatus(campaignId, { contactId: contact.contactId as string, phone: contact.phone }, 'failed', { error: errorMsg })
             failedCount++
             console.error(`❌ Error sending to ${contact.phone}:`, error)
           }

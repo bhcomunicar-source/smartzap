@@ -266,7 +266,9 @@ export const campaignService = {
 
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(payload?.error || 'Falha ao reenviar ignorados')
+      const base = payload?.error || 'Falha ao reenviar ignorados'
+      const details = payload?.details ? String(payload.details) : ''
+      throw new Error(details ? `${base}: ${details}` : base)
     }
     return payload
   },

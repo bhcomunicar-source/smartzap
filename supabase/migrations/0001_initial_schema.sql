@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS campaign_contacts (
   failure_code INTEGER,
   failure_reason TEXT,
   custom_fields JSONB DEFAULT '{}'::jsonb,
-  UNIQUE(campaign_id, phone)
+  UNIQUE(campaign_id, contact_id)
 );
 
 COMMENT ON COLUMN campaign_contacts.email IS 'Snapshot do email do contato no momento da criação da campanha';
@@ -84,6 +84,51 @@ COMMENT ON COLUMN campaign_contacts.custom_fields IS 'Snapshot dos custom_fields
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_campaign ON campaign_contacts(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_status ON campaign_contacts(status);
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_failure ON campaign_contacts(failure_code);
+
+-- Phone é usado para buscas rápidas/idempotência em rotas/workers.
+CREATE INDEX IF NOT EXISTS idx_campaign_contacts_campaign_phone ON campaign_contacts(campaign_id, phone);
+
+-- Migração segura (para bancos que já tinham UNIQUE(campaign_id, phone))
+WITH ranked AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY campaign_id, contact_id
+      ORDER BY COALESCE(read_at, delivered_at, sent_at, failed_at) DESC NULLS LAST, id DESC
+    ) AS rn
+  FROM campaign_contacts
+  WHERE contact_id IS NOT NULL
+)
+DELETE FROM campaign_contacts cc
+USING ranked r
+WHERE cc.id = r.id AND r.rn > 1;
+
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'campaign_contacts'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) LIKE '%(campaign_id, phone)%'
+  LOOP
+    EXECUTE format('ALTER TABLE campaign_contacts DROP CONSTRAINT %I', r.conname);
+  END LOOP;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'campaign_contacts'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) LIKE '%(campaign_id, contact_id)%'
+  ) THEN
+    ALTER TABLE campaign_contacts
+      ADD CONSTRAINT campaign_contacts_campaign_id_contact_id_key UNIQUE (campaign_id, contact_id);
+  END IF;
+END $$;
 
 -- =============================================================================
 -- TEMPLATES
@@ -294,6 +339,16 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'template_project_items') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE template_project_items;
+  END IF;
+
+  -- Habilita realtime para custom_field_definitions
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'custom_field_definitions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE custom_field_definitions;
+  END IF;
+
+  -- Habilita realtime para account_alerts (banner de pagamento/auth em tempo real)
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'account_alerts') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE account_alerts;
   END IF;
 END $$;
 

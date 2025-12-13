@@ -163,11 +163,47 @@ export async function POST(_request: Request, { params }: Params) {
 
     const nowIso = new Date().toISOString()
 
-    const validForResend: Array<{ contactId?: string; phone: string; name: string; email?: string; custom_fields?: Record<string, unknown> }> = []
+    const validForResend: Array<{ contactId: string; phone: string; name: string; email?: string; custom_fields?: Record<string, unknown> }> = []
     const updates: Array<any> = []
 
+    // 3.2) Para registros antigos sem contact_id, tenta resolver via contacts.phone (UNIQUE)
+    const missingIdPhones = Array.from(
+      new Set(
+        contacts
+          .filter((c) => !c.contact_id)
+          .map((c) => String(c.phone || '').trim())
+          .filter((p) => p.length > 0)
+      )
+    )
+
+    const idByPhone = new Map<string, string>()
+    if (missingIdPhones.length > 0) {
+      const { data: resolvedByPhone, error: resolvedByPhoneError } = await supabase
+        .from('contacts')
+        .select('id, phone')
+        .in('phone', missingIdPhones)
+
+      if (resolvedByPhoneError) {
+        return NextResponse.json(
+          { error: 'Falha ao resolver contatos por telefone', details: resolvedByPhoneError.message },
+          { status: 500 }
+        )
+      }
+
+      for (const r of (resolvedByPhone || []) as any[]) {
+        if (!r?.id || !r?.phone) continue
+        idByPhone.set(String(r.phone), String(r.id))
+      }
+    }
+
+    // Para evitar 500 por UNIQUE(campaign_id, phone):
+    // vamos montar as intenções (desiredPhone) e validar conflitos antes do upsert.
+    const desiredByRowId = new Map<string, { desiredPhone: string; originalPhone: string }>()
+    const desiredPhoneToRowIds = new Map<string, string[]>()
+
     for (const row of contacts) {
-      const latest = row.contact_id ? contactById.get(row.contact_id) : undefined
+      const resolvedContactId = row.contact_id || idByPhone.get(String(row.phone || '').trim()) || null
+      const latest = resolvedContactId ? contactById.get(resolvedContactId) : undefined
       const effectiveName = (latest?.name ?? row.name ?? '') as string
       const effectivePhone = (latest?.phone ?? row.phone) as string
       const effectiveEmail = (latest?.email ?? row.email) as string | null
@@ -179,15 +215,32 @@ export async function POST(_request: Request, { params }: Params) {
           name: effectiveName || '',
           email: effectiveEmail || undefined,
           custom_fields: effectiveCustomFields || {},
-          contactId: row.contact_id || null,
+          contactId: resolvedContactId,
         },
         template as any,
         templateVariables
       )
 
+      if (!resolvedContactId) {
+        updates.push({
+          id: row.id,
+          status: 'skipped',
+          phone: precheck.normalizedPhone || effectivePhone,
+          name: effectiveName || null,
+          email: effectiveEmail,
+          custom_fields: effectiveCustomFields,
+          failure_reason: 'Contato sem ID (registro antigo ou contato removido). Abra o contato e salve novamente.',
+          error: 'Contato sem ID (registro antigo ou contato removido). Abra o contato e salve novamente.',
+          message_id: null,
+          failed_at: null,
+        })
+        continue
+      }
+
       if (!precheck.ok) {
         updates.push({
           id: row.id,
+          contact_id: resolvedContactId,
           status: 'skipped',
           // Mantém snapshot sincronizado com o contato atual
           phone: precheck.normalizedPhone || effectivePhone,
@@ -203,9 +256,16 @@ export async function POST(_request: Request, { params }: Params) {
         continue
       }
 
+      // Candidato válido: registrar intenção de phone normalizado para checar conflitos.
+      desiredByRowId.set(row.id, { desiredPhone: precheck.normalizedPhone, originalPhone: row.phone })
+      const arr = desiredPhoneToRowIds.get(precheck.normalizedPhone) || []
+      arr.push(row.id)
+      desiredPhoneToRowIds.set(precheck.normalizedPhone, arr)
+
       // Válido: volta para pending e limpa campos de skip/erro
       updates.push({
         id: row.id,
+        contact_id: resolvedContactId,
         phone: precheck.normalizedPhone,
         name: effectiveName || null,
         email: effectiveEmail,
@@ -219,12 +279,90 @@ export async function POST(_request: Request, { params }: Params) {
       })
 
       validForResend.push({
-        contactId: row.contact_id || undefined,
+        contactId: resolvedContactId,
         phone: precheck.normalizedPhone,
         name: effectiveName || '',
         email: effectiveEmail || undefined,
         custom_fields: effectiveCustomFields || {},
       })
+    }
+
+    // 3.2) Resolver conflitos de phone dentro do próprio lote
+    // Se mais de um row for para o mesmo phone normalizado, reenfileira só o primeiro.
+    const rowIdsToForceSkip = new Set<string>()
+    for (const [phone, rowIds] of desiredPhoneToRowIds.entries()) {
+      if (rowIds.length <= 1) continue
+      // mantém o primeiro, pula os demais
+      for (const id of rowIds.slice(1)) rowIdsToForceSkip.add(id)
+    }
+
+    // 3.3) Resolver conflitos com outros registros já existentes na campanha
+    const desiredPhones = Array.from(desiredPhoneToRowIds.keys())
+    const existingPhoneToId = new Map<string, string>()
+    if (desiredPhones.length > 0) {
+      const { data: existingRows, error: existingError } = await supabase
+        .from('campaign_contacts')
+        .select('id, phone')
+        .eq('campaign_id', campaignId)
+        .in('phone', desiredPhones)
+
+      if (existingError) {
+        return NextResponse.json(
+          { error: 'Falha ao validar conflitos de telefone', details: existingError.message },
+          { status: 500 }
+        )
+      }
+
+      for (const r of (existingRows || []) as any[]) {
+        if (!r?.id || !r?.phone) continue
+        existingPhoneToId.set(String(r.phone), String(r.id))
+      }
+
+      for (const [phone, rowIds] of desiredPhoneToRowIds.entries()) {
+        const existingId = existingPhoneToId.get(phone)
+        if (!existingId) continue
+        // Se o phone já existe em outro registro (id diferente do próprio row), é conflito.
+        for (const rowId of rowIds) {
+          if (existingId !== rowId) rowIdsToForceSkip.add(rowId)
+        }
+      }
+    }
+
+    if (rowIdsToForceSkip.size > 0) {
+      // Ajustar updates + validForResend removendo os conflitados
+      const conflictReason = 'Telefone duplicado na campanha após normalização. Ajuste o telefone do contato e tente novamente.'
+
+      // 1) Converte qualquer update pendente desses ids para skipped (sem trocar phone)
+      for (let i = 0; i < updates.length; i++) {
+        const u = updates[i]
+        if (!u?.id || !rowIdsToForceSkip.has(String(u.id))) continue
+        // Se era candidato a pending, força skipped e preserva phone original (evita bater na UNIQUE)
+        const info = desiredByRowId.get(String(u.id))
+        updates[i] = {
+          id: u.id,
+          status: 'skipped',
+          phone: info?.originalPhone || u.phone,
+          name: u.name ?? null,
+          email: u.email ?? null,
+          custom_fields: u.custom_fields ?? {},
+          failure_reason: conflictReason,
+          error: conflictReason,
+          message_id: null,
+          failed_at: null,
+        }
+      }
+
+      // 2) Remove do validForResend
+      const blockedPhones = new Set<string>()
+      for (const rowId of rowIdsToForceSkip) {
+        const info = desiredByRowId.get(rowId)
+        if (info?.desiredPhone) blockedPhones.add(info.desiredPhone)
+      }
+      if (blockedPhones.size > 0) {
+        for (let i = validForResend.length - 1; i >= 0; i--) {
+          if (blockedPhones.has(validForResend[i].phone)) validForResend.splice(i, 1)
+        }
+      }
     }
 
     // 4) Persistir updates (bulk upsert por PK id)
@@ -241,7 +379,11 @@ export async function POST(_request: Request, { params }: Params) {
     const stillSkipped = contacts.length - validForResend.length
 
     // Atualiza contador de skipped na campanha (para UI imediata)
-    await campaignDb.updateStatus(campaignId, { skipped: stillSkipped })
+    try {
+      await campaignDb.updateStatus(campaignId, { skipped: stillSkipped })
+    } catch (e) {
+      console.warn('[ResendSkipped] Falha ao atualizar contador de skipped na campanha (best-effort):', e)
+    }
 
     // 5) Se ninguém ficou válido, não enfileira
     if (validForResend.length === 0) {

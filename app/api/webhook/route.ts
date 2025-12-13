@@ -126,8 +126,7 @@ export async function POST(request: NextRequest) {
                 const { data: updatedRows, error: updateError } = await supabase
                   .from('campaign_contacts')
                   .update({ status: 'delivered', delivered_at: now })
-                  .eq('campaign_id', campaignId)
-                  .eq('phone', phone)
+                  .eq('message_id', messageId)
                   .neq('status', 'delivered')
                   .neq('status', 'read')
                   .select('id')
@@ -176,8 +175,7 @@ export async function POST(request: NextRequest) {
                 const { data: updatedRowsRead, error: updateErrorRead } = await supabase
                   .from('campaign_contacts')
                   .update({ status: 'read', read_at: nowRead })
-                  .eq('campaign_id', campaignId)
-                  .eq('phone', phone)
+                  .eq('message_id', messageId)
                   .neq('status', 'read')
                   .select('id')
 
@@ -228,8 +226,7 @@ export async function POST(request: NextRequest) {
                     failure_code: errorCode,
                     failure_reason: failureReason
                   })
-                  .eq('campaign_id', campaignId)
-                  .eq('phone', phone)
+                  .eq('message_id', messageId)
                   .neq('status', 'failed')
                   .select('id')
 

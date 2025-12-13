@@ -245,6 +245,8 @@ export type RealtimeTable =
   | 'campaigns'
   | 'campaign_contacts'
   | 'contacts'
+  | 'custom_field_definitions'
+  | 'account_alerts'
   | 'template_projects'
   | 'template_project_items';
 

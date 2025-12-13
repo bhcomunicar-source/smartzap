@@ -2,7 +2,7 @@ import { CustomFieldDefinition } from '../types';
 
 export const customFieldService = {
     getAll: async (entityType: 'contact' | 'deal' = 'contact'): Promise<CustomFieldDefinition[]> => {
-        const response = await fetch(`/api/custom-fields?entityType=${entityType}`);
+        const response = await fetch(`/api/custom-fields?entityType=${entityType}`, { cache: 'no-store' });
         if (!response.ok) {
             throw new Error('Falha ao buscar campos personalizados');
         }

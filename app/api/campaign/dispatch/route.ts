@@ -5,12 +5,21 @@ import { supabase } from '@/lib/supabase'
 import { templateDb } from '@/lib/supabase-db'
 
 import { precheckContactForTemplate } from '@/lib/whatsapp/template-contract'
+import { normalizePhoneNumber } from '@/lib/phone-formatter'
 
 import { ContactStatus } from '@/types'
 
 interface DispatchContact {
   contactId?: string
   contact_id?: string
+  phone: string
+  name: string
+  email?: string
+  custom_fields?: Record<string, unknown>
+}
+
+interface DispatchContactResolved {
+  contactId: string
   phone: string
   name: string
   email?: string
@@ -132,11 +141,82 @@ export async function POST(request: NextRequest) {
   const nowIso = new Date().toISOString()
   const inputContacts = (contacts as DispatchContact[])
 
-  const validContacts: DispatchContact[] = []
+  // =====================================================================
+  // HARDENING: garantir contactId (fonte de verdade do destinatário)
+  // - Para campanhas novas, a UI deve sempre mandar contactId.
+  // - Para campanhas antigas/clone, podemos resolver via phone (contacts.phone é UNIQUE).
+  // =====================================================================
+
+  // 1) Normaliza payload (resolve contactId/contact_id em um único campo)
+  const normalizedInput: DispatchContact[] = inputContacts.map((c) => {
+    const contactId = c.contactId || c.contact_id
+    return { ...c, contactId, contact_id: undefined }
+  })
+
+  // 2) Tentar resolver contactId faltante via contacts.phone
+  const missingId = normalizedInput.filter((c) => !c.contactId)
+  if (missingId.length > 0) {
+    const phoneCandidates = Array.from(
+      new Set(
+        missingId
+          .flatMap((c) => {
+            const raw = String(c.phone || '').trim()
+            if (!raw) return []
+            const normalized = normalizePhoneNumber(raw)
+            return normalized && normalized !== raw ? [raw, normalized] : [raw]
+          })
+          .filter(Boolean)
+      )
+    )
+
+    if (phoneCandidates.length > 0) {
+      const { data: contactsByPhone, error: lookupError } = await supabase
+        .from('contacts')
+        .select('id, phone')
+        .in('phone', phoneCandidates)
+
+      if (lookupError) {
+        console.error('[Dispatch] Falha ao resolver contactId via phone:', lookupError)
+        return NextResponse.json(
+          { error: 'Falha ao resolver contatos (contactId)', details: lookupError.message },
+          { status: 500 }
+        )
+      }
+
+      const idByPhone = new Map<string, string>()
+      for (const row of (contactsByPhone || []) as any[]) {
+        if (!row?.id || !row?.phone) continue
+        idByPhone.set(String(row.phone), String(row.id))
+      }
+
+      for (const c of normalizedInput) {
+        if (c.contactId) continue
+        const raw = String(c.phone || '').trim()
+        const normalized = raw ? normalizePhoneNumber(raw) : ''
+        c.contactId = idByPhone.get(raw) || (normalized ? idByPhone.get(normalized) : undefined)
+      }
+    }
+  }
+
+  // 3) Se ainda houver contato sem ID, bloqueia para evitar dados inconsistentes.
+  //    (Isso elimina definitivamente o caminho "sem contactId" no workflow.)
+  const stillMissing = normalizedInput.filter((c) => !c.contactId)
+  if (stillMissing.length > 0) {
+    return NextResponse.json(
+      {
+        error: 'Alguns contatos não possuem contactId (não é possível disparar com segurança).',
+        missing: stillMissing.map((c) => ({ phone: c.phone, name: c.name || '' })),
+        action: 'Recarregue a lista de contatos e tente novamente. Se o contato foi removido, remova-o da campanha.'
+      },
+      { status: 400 }
+    )
+  }
+
+  const validContacts: DispatchContactResolved[] = []
   const skippedContacts: Array<{ contact: DispatchContact; code: string; reason: string; normalizedPhone?: string }> = []
 
-  for (const c of inputContacts) {
-    const contactId = c.contactId || c.contact_id
+  for (const c of normalizedInput) {
+    const contactId = c.contactId
     const precheck = precheckContactForTemplate(
       {
         phone: c.phone,
@@ -155,9 +235,11 @@ export async function POST(request: NextRequest) {
     }
 
     validContacts.push({
-      ...c,
-      contactId,
       phone: precheck.normalizedPhone,
+      name: c.name,
+      email: c.email,
+      custom_fields: c.custom_fields,
+      contactId: contactId as string,
     })
   }
 
@@ -165,7 +247,7 @@ export async function POST(request: NextRequest) {
   try {
     const rowsPending = validContacts.map(c => ({
       campaign_id: campaignId,
-      contact_id: c.contactId || c.contact_id || null,
+      contact_id: c.contactId || null,
       phone: c.phone,
       name: c.name || '',
       email: c.email || null,
@@ -179,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     const rowsSkipped = skippedContacts.map(({ contact, code, reason, normalizedPhone }) => ({
       campaign_id: campaignId,
-      contact_id: contact.contactId || contact.contact_id || null,
+      contact_id: contact.contactId || null,
       phone: normalizedPhone || contact.phone,
       name: contact.name || '',
       email: contact.email || null,
@@ -195,7 +277,7 @@ export async function POST(request: NextRequest) {
     if (allRows.length) {
       const { error } = await supabase
         .from('campaign_contacts')
-        .upsert(allRows, { onConflict: 'campaign_id, phone' })
+        .upsert(allRows, { onConflict: 'campaign_id, contact_id' })
 
       if (error) throw error
     }
@@ -286,7 +368,7 @@ export async function POST(request: NextRequest) {
     const workflowPayload = {
       campaignId,
       templateName,
-      contacts: validContacts as DispatchContact[],
+      contacts: validContacts,
       templateVariables: resolvedTemplateVariables,
       templateSnapshot: {
         name: template.name,

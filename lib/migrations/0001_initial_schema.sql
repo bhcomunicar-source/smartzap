@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS campaign_contacts (
   skip_reason TEXT,
   failure_code INTEGER,
   failure_reason TEXT,
-  UNIQUE(campaign_id, phone)
+  UNIQUE(campaign_id, contact_id)
 );
 
 -- Snapshot Pattern: allow adding the column on existing databases
@@ -133,6 +133,56 @@ COMMENT ON COLUMN campaign_contacts.sending_at IS 'Quando o contato foi "claimad
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_campaign ON campaign_contacts(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_status ON campaign_contacts(status);
 CREATE INDEX IF NOT EXISTS idx_campaign_contacts_failure ON campaign_contacts(failure_code);
+
+-- Phone é usado para buscas rápidas/idempotência no workflow.
+CREATE INDEX IF NOT EXISTS idx_campaign_contacts_campaign_phone ON campaign_contacts(campaign_id, phone);
+
+-- Migração segura: alguns bancos antigos podem ter UNIQUE(campaign_id, phone).
+-- Isso causa colisões quando o telefone é normalizado. A regra do produto é 1 contato (contact_id) por campanha.
+
+-- 1) Limpa duplicados por (campaign_id, contact_id) mantendo o registro mais "avançado".
+WITH ranked AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY campaign_id, contact_id
+      ORDER BY COALESCE(read_at, delivered_at, sent_at, failed_at, skipped_at, sending_at) DESC NULLS LAST, id DESC
+    ) AS rn
+  FROM campaign_contacts
+  WHERE contact_id IS NOT NULL
+)
+DELETE FROM campaign_contacts cc
+USING ranked r
+WHERE cc.id = r.id AND r.rn > 1;
+
+-- 2) Remove qualquer constraint UNIQUE que seja exatamente (campaign_id, phone)
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'campaign_contacts'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) LIKE '%(campaign_id, phone)%'
+  LOOP
+    EXECUTE format('ALTER TABLE campaign_contacts DROP CONSTRAINT %I', r.conname);
+  END LOOP;
+END $$;
+
+-- 3) Garante a constraint UNIQUE por (campaign_id, contact_id)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'campaign_contacts'::regclass
+      AND contype = 'u'
+      AND pg_get_constraintdef(oid) LIKE '%(campaign_id, contact_id)%'
+  ) THEN
+    ALTER TABLE campaign_contacts
+      ADD CONSTRAINT campaign_contacts_campaign_id_contact_id_key UNIQUE (campaign_id, contact_id);
+  END IF;
+END $$;
 
 -- =============================================================================
 -- TEMPLATES
