@@ -449,7 +449,12 @@ Checklist:
 
 ### WhatsApp (opcional) — erros comuns
 
-- **Webhook não atualiza status (delivered/read/failed)**: confirme `WHATSAPP_VERIFY_TOKEN` (se aplicável ao seu fluxo) e se o endpoint está apontando para o domínio correto.
+- **Webhook não atualiza status (delivered/read/failed)**:
+    - confirme se o endpoint configurado na Meta está apontando para `https://SEU-DOMINIO/api/webhook`.
+    - confirme o **verify token**:
+        - no SmartZap ele vem do **Supabase settings** (`webhook_verify_token`) e, como fallback, da env `WEBHOOK_VERIFY_TOKEN`.
+        - a verificação exige que o GET em `/api/webhook` responda **200** e devolva o `hub.challenge` quando `hub.verify_token` bater.
+    - **Preview na Vercel**: se você tentar usar uma URL de Preview como callback, e o Preview estiver protegido (Vercel Deployment Protection), a Meta vai receber **401 Unauthorized** e falhar a verificação. Use o domínio de Production ou desabilite a proteção no Preview.
 - **131042 (payment)**: conta do WhatsApp Business com problema de pagamento; o painel costuma mostrar alerta de conta.
 - **131056 (pair rate limit)**: envio rápido demais para o mesmo destinatário; reexecute com espaçamento (o sistema tem backoff/retries).
 

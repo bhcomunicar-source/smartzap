@@ -146,7 +146,12 @@ export const useSettingsController = () => {
       return data as WebhookSubscriptionStatus;
     },
     enabled: !!settingsQuery.data?.isConnected,
-    staleTime: 60 * 1000,
+    // Importante: esse status costuma confundir (Meta UI vs subscribed_apps).
+    // Para evitar mostrar “Inativo” com cache ao navegar para Configurações,
+    // sempre revalida ao montar.
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     retry: false,
   });
 
@@ -314,9 +319,18 @@ export const useSettingsController = () => {
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
-      toast.success('Inscrição do campo "messages" ativada!');
+    onSuccess: async (data: any) => {
+      await queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
+      await queryClient.refetchQueries({ queryKey: ['metaWebhookSubscription'] });
+
+      const confirmed = !!data?.confirmed;
+      if (confirmed) {
+        toast.success('Inscrição do campo "messages" ativada!');
+      } else {
+        toast.warning('Inscrição solicitada, mas a Meta ainda não confirmou.', {
+          description: 'Clique em “Atualizar status” em alguns segundos (ou tente de novo).',
+        });
+      }
     },
     onError: (err: any) => {
       toast.error(err?.message || 'Erro ao ativar inscrição');
@@ -336,9 +350,18 @@ export const useSettingsController = () => {
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
-      toast.success('Inscrição removida.');
+    onSuccess: async (data: any) => {
+      await queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
+      await queryClient.refetchQueries({ queryKey: ['metaWebhookSubscription'] });
+
+      const confirmed = data?.confirmed;
+      if (confirmed === true) {
+        toast.success('Inscrição removida.');
+      } else {
+        toast.message('Remoção solicitada.', {
+          description: 'Atualize o status para confirmar no WABA.',
+        });
+      }
     },
     onError: (err: any) => {
       toast.error(err?.message || 'Erro ao remover inscrição');
@@ -420,13 +443,25 @@ export const useSettingsController = () => {
         body: JSON.stringify({
           // accessToken é obtido no servidor a partir das credenciais salvas (Supabase/env)
           callbackUrl,
-          verifyToken: webhookQuery.data?.webhookToken, // Use the auto-generated token
+          // Preflight por padrão: retorna erro mais claro quando Preview está protegido (401)
+          preflight: true,
+          force: false,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao configurar webhook');
+        const error = await response.json().catch(() => ({}));
+        const title = (error as any)?.error || 'Erro ao configurar webhook';
+        const hint = (error as any)?.hint || (error as any)?.action;
+        const code = (error as any)?.code;
+
+        if (hint) {
+          toast.error(title, {
+            description: code ? `${hint} (código: ${code})` : hint,
+          });
+        } else {
+          toast.error(title);
+        }
         return false;
       }
 

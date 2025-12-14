@@ -24,6 +24,13 @@ async function getWhatsAppAccessToken(): Promise<string | null> {
 // Get or generate webhook verify token (Supabase settings preferred, env var fallback)
 import { getVerifyToken } from '@/lib/verify-token'
 
+function maskTokenPreview(token: string | null | undefined): string {
+  if (!token) return '—'
+  const t = String(token)
+  if (t.length <= 8) return `${t.slice(0, 2)}…(${t.length})`
+  return `${t.slice(0, 3)}…${t.slice(-3)}(${t.length})`
+}
+
 // Meta Webhook Verification
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -35,8 +42,14 @@ export async function GET(request: NextRequest) {
 
   console.log('🔍 Webhook Verification Request:')
   console.log(`- Mode: ${mode}`)
-  console.log(`- Received Token: ${token}`)
-  console.log(`- Expected Token: ${MY_VERIFY_TOKEN}`)
+  console.log(`- Received Token: ${maskTokenPreview(token)}`)
+  console.log(`- Expected Token: ${maskTokenPreview(MY_VERIFY_TOKEN)}`)
+
+  if (MY_VERIFY_TOKEN === 'token-not-found-readonly') {
+    console.warn(
+      '⚠️ Webhook verify token ausente em modo readonly. Configure em settings (webhook_verify_token) ou via env WEBHOOK_VERIFY_TOKEN.'
+    )
+  }
 
   if (mode === 'subscribe' && token === MY_VERIFY_TOKEN) {
     console.log('✅ Webhook verified successfully')

@@ -14,6 +14,7 @@ async function getMetaSubscriptionStatus(params: { wabaId: string; accessToken: 
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
+    cache: 'no-store',
   })
 
   if (!response.ok) {
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: form.toString(),
+    cache: 'no-store',
   })
 
   if (!response.ok) {
@@ -140,6 +142,7 @@ export async function POST(request: Request) {
     ok: true,
     wabaId: credentials.businessAccountId,
     requestedFields: fields,
+    confirmed: status.ok ? status.messagesSubscribed : false,
     status: status.ok
       ? {
           messagesSubscribed: status.messagesSubscribed,
@@ -169,6 +172,7 @@ export async function DELETE() {
     headers: {
       Authorization: `Bearer ${credentials.accessToken}`,
     },
+    cache: 'no-store',
   })
 
   if (!response.ok) {
@@ -192,6 +196,7 @@ export async function DELETE() {
   return NextResponse.json({
     ok: true,
     wabaId: credentials.businessAccountId,
+    confirmed: status.ok ? !status.messagesSubscribed : null,
     status: status.ok
       ? {
           messagesSubscribed: status.messagesSubscribed,

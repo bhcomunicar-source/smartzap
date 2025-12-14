@@ -1146,7 +1146,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     ) : (
                       <>
                         <AlertCircle size={16} className="text-amber-400" />
-                        <span className="text-amber-300">Inativo</span>
+                        <span className="text-amber-300">Inativo (via API)</span>
                         <span className="text-gray-500">·</span>
                         <span className="text-gray-400 text-xs">WABA: {webhookSubscription.wabaId}</span>
                       </>
@@ -1162,6 +1162,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {webhookSubscription && !webhookSubscriptionLoading && webhookSubscription.ok && (
                   <div className="text-[11px] text-gray-500">
                     Campos ativos: {webhookSubscription.subscribedFields?.length ? webhookSubscription.subscribedFields.join(', ') : '—'}
+                  </div>
+                )}
+
+                {webhookSubscription && !webhookSubscriptionLoading && webhookSubscription.ok && !webhookSubscription.messagesSubscribed && (
+                  <div className="text-[11px] text-amber-300/70 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    Se no painel da Meta estiver “Ativo” e aqui não, pode haver atraso de propagação ou permissões do token. Clique em “Atualizar status” ou use “Ativar messages” para forçar via API.
                   </div>
                 )}
 

@@ -54,7 +54,8 @@ Use `.env.local` no local e *Environment Variables* na Vercel.
 
 ### Opcionais
 
-- WhatsApp: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_VERIFY_TOKEN`
+- WhatsApp: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`
+- Webhook (verify token): Supabase settings (`webhook_verify_token`) e, como fallback, `WEBHOOK_VERIFY_TOKEN`
 - Métricas Upstash: `UPSTASH_EMAIL`, `UPSTASH_API_KEY`
 - IA: `GEMINI_API_KEY`
 

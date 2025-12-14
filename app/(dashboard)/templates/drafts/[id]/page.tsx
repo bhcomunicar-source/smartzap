@@ -10,15 +10,30 @@ import { Page, PageActions, PageHeader, PageTitle, PageDescription } from '@/com
 import { manualDraftsService } from '@/services/manualDraftsService'
 import { ManualTemplateBuilder } from '@/components/features/templates/ManualTemplateBuilder'
 
-export default function ManualDraftEditorPage({ params }: { params: { id: string } }) {
+export default function ManualDraftEditorPage({
+  params,
+}: {
+  // Em páginas client do Next, `params` pode ser Promise.
+  // Precisamos desempacotar com `React.use()` antes de acessar as propriedades.
+  params: Promise<{ id: string }>
+}) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const id = params.id
+  const { id } = React.use(params)
+
+  // Em Client Components, o HTML pode ser renderizado no servidor.
+  // Não podemos executar fetch autenticado (cookies do browser) durante SSR.
+  // Então habilitamos a query apenas após o componente montar no browser.
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const draftQuery = useQuery({
     queryKey: ['templates', 'drafts', 'manual', id],
     queryFn: async () => manualDraftsService.get(id),
-    enabled: typeof window !== 'undefined' && !!id,
+    enabled: mounted && !!id,
   })
 
   const updateMutation = useMutation({
@@ -44,6 +59,8 @@ export default function ManualDraftEditorPage({ params }: { params: { id: string
 
   const draft = draftQuery.data
   const loadErrorMessage = draftQuery.error instanceof Error ? draftQuery.error.message : 'Erro desconhecido'
+
+  const shouldShowLoading = !mounted || draftQuery.isLoading
 
   return (
     <Page>
@@ -82,7 +99,7 @@ export default function ManualDraftEditorPage({ params }: { params: { id: string
         </PageActions>
       </PageHeader>
 
-      {draftQuery.isLoading ? (
+      {shouldShowLoading ? (
         <div className="glass-panel p-8 rounded-xl text-gray-300 flex items-center gap-3">
           <Loader2 className="w-5 h-5 animate-spin" />
           Carregando rascunho...
