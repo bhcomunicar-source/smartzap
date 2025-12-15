@@ -36,6 +36,8 @@ import {
   validateFlowFormSpec,
 } from '@/lib/flow-form'
 
+import { FlowPhonePreview } from '@/components/ui/FlowPhonePreview'
+
 const FIELD_TYPE_LABEL: Record<FlowFormFieldType, string> = {
   short_text: 'Texto curto',
   long_text: 'Texto longo',
@@ -247,30 +249,47 @@ export function FlowFormBuilder(props: {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-zinc-950/20 p-4">
-            <div className="text-sm font-semibold text-white">Status</div>
-            <div className="mt-2 text-sm text-gray-400">
-              {dirty ? 'Alterações não salvas' : 'Sincronizado'}
-              {issues.length === 0 ? (
-                <span className="text-emerald-300"> • pronto</span>
-              ) : (
-                <span className="text-amber-300"> • revisar</span>
-              )}
+          <div className="space-y-3">
+            <div className="hidden lg:block">
+              <div className="sticky top-6">
+                <div className="text-xs uppercase tracking-widest font-bold text-gray-400 flex items-center justify-center">
+                  Prévia do Flow
+                </div>
+                <div className="mt-3">
+                  <FlowPhonePreview
+                    flowJson={generatedJson}
+                    businessName="SmartZap Business"
+                    size="md"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="mt-3 text-[11px] text-gray-500">
-              Este modo cria o JSON no padrão usado pelos templates internos (sem endpoint).
-            </div>
+            <div className="rounded-xl border border-white/10 bg-zinc-950/20 p-4">
+              <div className="text-sm font-semibold text-white">Status</div>
+              <div className="mt-2 text-sm text-gray-400">
+                {dirty ? 'Alterações não salvas' : 'Sincronizado'}
+                {issues.length === 0 ? (
+                  <span className="text-emerald-300"> • pronto</span>
+                ) : (
+                  <span className="text-amber-300"> • revisar</span>
+                )}
+              </div>
 
-            <Button
-              type="button"
-              className="mt-3 w-full"
-              disabled={!canSave}
-              onClick={save}
-            >
-              <Save className="h-4 w-4" />
-              Salvar
-            </Button>
+              <div className="mt-3 text-[11px] text-gray-500">
+                Este modo cria o JSON no padrão usado pelos templates internos (sem endpoint).
+              </div>
+
+              <Button
+                type="button"
+                className="mt-3 w-full"
+                disabled={!canSave}
+                onClick={save}
+              >
+                <Save className="h-4 w-4" />
+                Salvar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
