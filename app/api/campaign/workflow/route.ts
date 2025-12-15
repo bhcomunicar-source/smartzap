@@ -847,7 +847,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
 
           // Persistência best-effort para baselines (não pode quebrar o envio).
           try {
-            await supabase
+            const { error: batchMetricsErr } = await supabase
               .from('campaign_batch_metrics')
               .insert({
                 campaign_id: campaignId,
@@ -869,6 +869,8 @@ export const { POST } = serve<CampaignWorkflowInput>(
                 batch_ok: batchOk,
                 error: batchError,
               })
+
+            if (batchMetricsErr) throw batchMetricsErr
           } catch (e) {
             console.warn(
               '[metrics] failed to insert campaign_batch_metrics',
@@ -879,6 +881,21 @@ export const { POST } = serve<CampaignWorkflowInput>(
                 error: e instanceof Error ? e.message : String(e),
               })
             )
+
+            // Também emitimos no trace para aparecer no monitor.
+            try {
+              await emitWorkflowTrace({
+                traceId,
+                campaignId,
+                step,
+                batchIndex,
+                phase: 'metrics_batch_insert',
+                ok: false,
+                extra: { error: e instanceof Error ? e.message : String(e) },
+              })
+            } catch {
+              // best-effort
+            }
           }
         }
 
@@ -1014,7 +1031,7 @@ export const { POST } = serve<CampaignWorkflowInput>(
 
         const configHash = hashConfig(configSnapshot)
 
-        await supabase
+        const { error: runMetricsErr } = await supabase
           .from('campaign_run_metrics')
           .upsert(
             {
@@ -1037,6 +1054,8 @@ export const { POST } = serve<CampaignWorkflowInput>(
             },
             { onConflict: 'campaign_id,trace_id' }
           )
+
+        if (runMetricsErr) throw runMetricsErr
       } catch (e) {
         console.warn(
           '[metrics] failed to upsert campaign_run_metrics',
@@ -1046,6 +1065,20 @@ export const { POST } = serve<CampaignWorkflowInput>(
             error: e instanceof Error ? e.message : String(e),
           })
         )
+
+        // Também emitimos no trace para aparecer no monitor.
+        try {
+          await emitWorkflowTrace({
+            traceId,
+            campaignId,
+            step: 'complete-campaign',
+            phase: 'metrics_run_upsert',
+            ok: false,
+            extra: { error: e instanceof Error ? e.message : String(e) },
+          })
+        } catch {
+          // best-effort
+        }
       }
     })
   },
