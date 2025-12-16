@@ -26,18 +26,40 @@ import type {
 
 const META_BUSINESS_LOCKED_CODE = 131031
 
-function hasMetaBusinessLockedEvidence(checks: MetaDiagnosticsCheck[]): {
-  locked: boolean
-  evidence?: { source: string; count?: number }
-} {
+type MetaLockSignal =
+  | { kind: 'none' }
+  | { kind: 'historical'; evidence: { source: string; count?: number } }
+  | { kind: 'current'; evidence: { source: string; count?: number } }
+
+function hasMetaBusinessLockedEvidence(checks: MetaDiagnosticsCheck[]): MetaLockSignal {
+  // Regra: só tratamos como BLOQUEIO ATUAL se o Health Status estiver BLOCKED.
+  // Caso contrário, 131031 vira apenas um sinal histórico (ex.: ocorreu 1x em falhas recentes).
+
+  const health = checks.find((c) => c.id === 'meta_health_status')
+  const healthOverall = String((health?.details as any)?.overall || '')
+  const healthErrors = Array.isArray((health?.details as any)?.errors) ? ((health?.details as any)?.errors as any[]) : []
+  const healthHas131031 = healthErrors.some((e) => Number(e?.error_code) === META_BUSINESS_LOCKED_CODE)
+  const isBlockedNow = health?.status === 'fail' || healthOverall === 'BLOCKED'
+
+  if (isBlockedNow) {
+    return {
+      kind: 'current',
+      evidence: {
+        source: health?.title || 'Health Status',
+        ...(healthHas131031 ? { count: 1 } : null),
+      },
+    }
+  }
+
+  // Sinal histórico: falhas recentes (detalhe.top[]) inclui o código
   for (const c of checks) {
-    // Heurística 1: falhas recentes (detalhe.top[]) inclui o código
+    if (c.id !== 'internal_recent_failures') continue
     const top = (c.details as any)?.top
     if (Array.isArray(top)) {
       const found = top.find((x: any) => Number(x?.code) === META_BUSINESS_LOCKED_CODE)
       if (found) {
         return {
-          locked: true,
+          kind: 'historical',
           evidence: {
             source: c.title || c.id,
             count: typeof found?.count === 'number' ? found.count : undefined,
@@ -45,21 +67,9 @@ function hasMetaBusinessLockedEvidence(checks: MetaDiagnosticsCheck[]): {
         }
       }
     }
-
-    // Heurística 2: algum detalhe carrega o código diretamente
-    const code = (c.details as any)?.code
-    if (Number(code) === META_BUSINESS_LOCKED_CODE) {
-      return { locked: true, evidence: { source: c.title || c.id } }
-    }
-
-    // Heurística 3: mensagens de erro textuais
-    const msg = `${c.title} ${c.message} ${formatJsonMaybe(c.details)}`
-    if (msg.includes(String(META_BUSINESS_LOCKED_CODE)) || msg.toLowerCase().includes('business account locked')) {
-      return { locked: true, evidence: { source: c.title || c.id } }
-    }
   }
 
-  return { locked: false }
+  return { kind: 'none' }
 }
 
 function StatusBadge({ status }: { status: MetaDiagnosticsCheckStatus }) {
@@ -148,7 +158,7 @@ export function MetaDiagnosticsView(props: {
   const reportText = props.data?.report?.text || ''
   const { isCopied, copyToClipboard } = useCopyToClipboard({ timeout: 1800 })
   const lock = React.useMemo(() => hasMetaBusinessLockedEvidence(props.checks), [props.checks])
-  const apiActionsDisabled = props.isActing || lock.locked
+  const apiActionsDisabled = props.isActing || lock.kind === 'current'
 
   return (
     <Page>
@@ -260,17 +270,28 @@ export function MetaDiagnosticsView(props: {
         </div>
       </div>
 
-      {lock.locked && (
-        <div className="mt-4 glass-panel rounded-2xl p-6 border border-red-500/20 bg-red-500/5">
+      {lock.kind !== 'none' && (
+        <div
+          className={`mt-4 glass-panel rounded-2xl p-6 border ${
+            lock.kind === 'current'
+              ? 'border-red-500/20 bg-red-500/5'
+              : 'border-amber-500/20 bg-amber-500/5'
+          }`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <StatusBadge status="fail" />
-                <h3 className="text-sm font-semibold text-white truncate">Conta Business bloqueada (código {META_BUSINESS_LOCKED_CODE})</h3>
+                <StatusBadge status={lock.kind === 'current' ? 'fail' : 'warn'} />
+                <h3 className="text-sm font-semibold text-white truncate">
+                  {lock.kind === 'current'
+                    ? `Bloqueio atual detectado (código ${META_BUSINESS_LOCKED_CODE})`
+                    : `Sinal histórico de bloqueio (código ${META_BUSINESS_LOCKED_CODE})`}
+                </h3>
               </div>
               <div className="mt-2 text-sm text-gray-200">
-                A Meta bloqueou o Business Account. Enquanto isso estiver ativo, ações como “Ativar messages” e até envios podem falhar —
-                não há “auto-fix” via API aqui dentro.
+                {lock.kind === 'current'
+                  ? 'O Health Status da Meta indica BLOQUEIO na cadeia de envio (APP/BUSINESS/WABA/PHONE/TEMPLATE). Enquanto isso estiver ativo, ações e envios podem falhar — não há “auto-fix” via API aqui dentro.'
+                  : 'Detectamos o código 131031 em falhas recentes (últimos 7 dias), mas o Health Status atual não está bloqueado. Isso pode ter sido temporário ou relacionado a uma tentativa antiga.'}
               </div>
               <div className="mt-3 text-sm text-gray-300 space-y-1">
                 <div>
@@ -278,8 +299,17 @@ export function MetaDiagnosticsView(props: {
                 </div>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Abra o Business Manager e verifique alertas de pagamento, verificação e qualidade da conta.</li>
-                  <li>Se não houver caminho de auto-resolução, abra um chamado no suporte da Meta para desbloqueio do WABA.</li>
-                  <li>Depois do desbloqueio, volte aqui e clique em “Atualizar” e então “Ativar messages”.</li>
+                  {lock.kind === 'current' ? (
+                    <>
+                      <li>Se não houver caminho de auto-resolução, abra um chamado no suporte da Meta para desbloqueio do WABA.</li>
+                      <li>Depois do desbloqueio, volte aqui e clique em “Atualizar” e então “Ativar messages”.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Se o problema voltar a acontecer, use o “Copiar relatório” e envie junto do <span className="font-mono">fbtrace_id</span> (quando houver) ao suporte da Meta.</li>
+                      <li>Se o objetivo agora é receber delivered/read, foque em ativar <span className="font-mono">messages</span> em <span className="font-mono">subscribed_apps</span> (botão “Ativar messages”).</li>
+                    </>
+                  )}
                 </ul>
               </div>
               <div className="mt-3 text-xs text-gray-400">
@@ -359,7 +389,7 @@ export function MetaDiagnosticsView(props: {
                   onRunAction={props.onRunAction}
                   disabled={apiActionsDisabled}
                   disabledReason={
-                    lock.locked
+                    lock.kind === 'current'
                       ? `Bloqueado pela Meta (código ${META_BUSINESS_LOCKED_CODE}). Resolva no Business Manager e tente novamente.`
                       : 'Executando ação…'
                   }

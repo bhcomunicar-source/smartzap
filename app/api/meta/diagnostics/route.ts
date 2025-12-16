@@ -324,8 +324,26 @@ function buildReportText(
 	lines.push(`SmartZap · Diagnóstico Meta/WhatsApp · ${new Date().toLocaleString('pt-BR')}`)
 	lines.push(`Ambiente: ${meta.vercelEnv || 'desconhecido'} · Credenciais: ${meta.source}`)
 	lines.push(`Webhook esperado: ${meta.webhookUrl}`)
-	if (checks.some((c) => hasCodeDeep(c.details, META_BUSINESS_LOCKED_CODE) || hasCodeDeep(c.message, META_BUSINESS_LOCKED_CODE))) {
-		lines.push(`ALERTA: Possível bloqueio Meta detectado (código ${META_BUSINESS_LOCKED_CODE} — Business Account locked)`)
+	const health = checks.find((c) => c.id === 'meta_health_status')
+	const healthOverall = String((health?.details as any)?.overall || '')
+	const healthIsBlocked = health?.status === 'fail' || healthOverall === 'BLOCKED'
+	const has131031Anywhere = checks.some(
+		(c) => hasCodeDeep(c.details, META_BUSINESS_LOCKED_CODE) || hasCodeDeep(c.message, META_BUSINESS_LOCKED_CODE)
+	)
+	const has131031InInternal = (() => {
+		const internal = checks.find((c) => c.id === 'internal_recent_failures')
+		return Boolean(internal && hasCodeDeep(internal.details, META_BUSINESS_LOCKED_CODE))
+	})()
+
+	if (healthIsBlocked) {
+		lines.push('ALERTA: Health Status indica BLOQUEIO para envio (BLOCKED).')
+		if (has131031Anywhere) {
+			lines.push(`Detalhe: há sinais do código ${META_BUSINESS_LOCKED_CODE} (Business Account locked) nos retornos.`)
+		}
+	} else if (has131031InInternal) {
+		lines.push(
+			`SINAL: o código ${META_BUSINESS_LOCKED_CODE} apareceu em falhas recentes (últimos 7 dias). Health Status atual não está BLOCKED — pode ter sido temporário.`
+		)
 	}
 	lines.push('')
 
