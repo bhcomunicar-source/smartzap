@@ -954,50 +954,99 @@ export const templateDb = {
     ): Promise<void> => {
         const now = new Date().toISOString()
 
+        const isMissingNewColumnsError = (err: unknown) => {
+            const message = String((err as any)?.message || err || '')
+            return (
+                message.includes('column') &&
+                (message.includes('parameter_format') || message.includes('spec_hash') || message.includes('fetched_at'))
+            )
+        }
+
         // Batch upsert (rows already in DB column format)
         if (Array.isArray(input)) {
-            const { error } = await supabase
-                .from('templates')
-                .upsert(
-                    input.map(r => ({
-                        name: r.name,
-                        category: r.category,
-                        language: r.language,
-                        status: r.status,
-                        parameter_format: (r as any).parameter_format,
-                        components: r.components,
-                        spec_hash: (r as any).spec_hash ?? null,
-                        fetched_at: (r as any).fetched_at ?? null,
-                        updated_at: now,
-                    })),
-                    { onConflict: 'name' }
-                )
-            if (error) throw error
-            return
+            const rowsWithNewCols = input.map(r => ({
+                name: r.name,
+                category: r.category,
+                language: r.language,
+                status: r.status,
+                parameter_format: (r as any).parameter_format,
+                components: r.components,
+                spec_hash: (r as any).spec_hash ?? null,
+                fetched_at: (r as any).fetched_at ?? null,
+                updated_at: now,
+            }))
+
+            try {
+                const { error } = await supabase
+                    .from('templates')
+                    .upsert(rowsWithNewCols as any, { onConflict: 'name' })
+                if (error) throw error
+                return
+            } catch (err) {
+                if (!isMissingNewColumnsError(err)) throw err
+
+                const legacyRows = input.map(r => ({
+                    name: r.name,
+                    category: r.category,
+                    language: r.language,
+                    status: r.status,
+                    components: r.components,
+                    updated_at: now,
+                }))
+
+                const { error } = await supabase
+                    .from('templates')
+                    .upsert(legacyRows as any, { onConflict: 'name' })
+                if (error) throw error
+                return
+            }
         }
 
         // Single template upsert (App Template shape)
         const template = input
 
-        const { error } = await supabase
-            .from('templates')
-            .upsert({
+        const components = typeof template.content === 'string'
+            ? JSON.parse(template.content)
+            : template.content
+
+        const rowWithNewCols = {
+            id: template.id,
+            name: template.name,
+            category: template.category,
+            language: template.language,
+            status: template.status,
+            parameter_format: (template as any).parameterFormat || 'positional',
+            components,
+            spec_hash: (template as any).specHash ?? null,
+            fetched_at: (template as any).fetchedAt ?? null,
+            created_at: now,
+            updated_at: now,
+        }
+
+        try {
+            const { error } = await supabase
+                .from('templates')
+                .upsert(rowWithNewCols as any, { onConflict: 'name' })
+            if (error) throw error
+        } catch (err) {
+            if (!isMissingNewColumnsError(err)) throw err
+
+            const legacyRow = {
                 id: template.id,
                 name: template.name,
                 category: template.category,
                 language: template.language,
                 status: template.status,
-                parameter_format: (template as any).parameterFormat || 'positional',
-                components: typeof template.content === 'string'
-                    ? JSON.parse(template.content)
-                    : template.content,
-                spec_hash: (template as any).specHash ?? null,
-                fetched_at: (template as any).fetchedAt ?? null,
+                components,
                 created_at: now,
                 updated_at: now,
-            }, { onConflict: 'name' })
+            }
 
-        if (error) throw error
+            const { error } = await supabase
+                .from('templates')
+                .upsert(legacyRow as any, { onConflict: 'name' })
+            if (error) throw error
+        }
     },
 }
 

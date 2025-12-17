@@ -138,9 +138,9 @@ export async function GET() {
       credentials.accessToken
     )
 
-    // 🆕 Sync templates to local Supabase DB (fire and forget)
-    // This ensures templateDb.getByName() finds templates during campaign dispatch
-    syncTemplatesToLocalDb(templates).catch(() => { })
+    // 🆕 Sync templates to local Supabase DB
+    // Importante: aguardamos para evitar race condition com /api/campaign/precheck.
+    await syncTemplatesToLocalDb(templates)
 
     return NextResponse.json(templates)
   } catch (error) {
