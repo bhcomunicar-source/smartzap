@@ -42,7 +42,8 @@ import { useExchangeRate } from '@/hooks/useExchangeRate'
 const steps = [
   { id: 1, label: 'Configuracao' },
   { id: 2, label: 'Publico' },
-  { id: 3, label: 'Agendamento' },
+  { id: 3, label: 'Validacao' },
+  { id: 4, label: 'Agendamento' },
 ]
 
 const getDefaultScheduleTime = () => {
@@ -72,6 +73,14 @@ const parsePickerDate = (value: string) => {
   const [y, m, d] = value.split('-').map((v) => Number(v))
   if (!y || !m || !d) return undefined
   return new Date(y, m - 1, d, 12, 0, 0)
+}
+
+const buildScheduledAt = (date: string, time: string) => {
+  if (!date || !time) return undefined
+  const [year, month, day] = date.split('-').map((v) => Number(v))
+  const [hour, minute] = time.split(':').map((v) => Number(v))
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) return undefined
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString()
 }
 
 type Contact = {
@@ -150,6 +159,7 @@ export default function CampaignsNewRealPage() {
   const [isFieldsSheetOpen, setIsFieldsSheetOpen] = useState(false)
   const [scheduleDate, setScheduleDate] = useState(() => new Date().toLocaleDateString('en-CA'))
   const [scheduleTime, setScheduleTime] = useState(() => getDefaultScheduleTime())
+  const userTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [templateVars, setTemplateVars] = useState<{ header: TemplateVar[]; body: TemplateVar[] }>({
     header: [],
@@ -163,8 +173,6 @@ export default function CampaignsNewRealPage() {
   const [precheckError, setPrecheckError] = useState<string | null>(null)
   const [precheckTotals, setPrecheckTotals] = useState<{ valid: number; skipped: number } | null>(null)
   const [precheckResult, setPrecheckResult] = useState<CampaignPrecheckResult | null>(null)
-  const [lastPrecheckKey, setLastPrecheckKey] = useState<string | null>(null)
-  const [showPrecheckPanel, setShowPrecheckPanel] = useState(false)
 
   // Aplicar em massa (bulk) um campo personalizado para desbloquear ignorados.
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -523,7 +531,6 @@ export default function CampaignsNewRealPage() {
     if (!templateSelected || !selectedTemplate?.name) return
     if (audienceMode === 'teste' && selectedTestCount === 0) return
 
-    setLastPrecheckKey(precheckContextKey)
     setIsPrecheckLoading(true)
     setPrecheckError(null)
     try {
@@ -622,7 +629,7 @@ export default function CampaignsNewRealPage() {
 
       const scheduledAt =
         scheduleMode === 'agendar' && scheduleDate && scheduleTime
-          ? new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
+          ? buildScheduledAt(scheduleDate, scheduleTime)
           : undefined
 
       const campaign = await campaignService.create({
@@ -879,45 +886,32 @@ export default function CampaignsNewRealPage() {
     setQuickEditTitle('Editar contato')
   }
 
-  const precheckContextKey = useMemo(() => {
-    if (!templateSelected || !selectedTemplate?.name) return 'no-template'
-    const buttonVars = Object.entries(templateButtonVars)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}:${v}`)
-    return JSON.stringify({
-      audienceMode,
-      selectedTags,
-      selectedCountries,
-      selectedStates,
-      sendToConfigured,
-      sendToSelected,
-      selectedTestContactId: selectedTestContact?.id || '',
-      configuredContactId: configuredContact?.id || '',
-      templateName: selectedTemplate.name,
-      headerVars: templateVars.header.map((item) => item.value.trim()),
-      bodyVars: templateVars.body.map((item) => item.value.trim()),
-      buttonVars,
-    })
+  useEffect(() => {
+    if (step !== 3) return
+    if (!templateSelected || !selectedTemplate?.name) return
+    if (audienceMode === 'teste' && selectedTestCount === 0) return
+    runPrecheck()
   }, [
-    audienceMode,
-    configuredContact?.id,
-    selectedCountries,
-    selectedStates,
-    selectedTags,
+    step,
+    templateSelected,
     selectedTemplate?.name,
-    selectedTestContact?.id,
+    audienceMode,
+    selectedTestCount,
     sendToConfigured,
     sendToSelected,
-    templateSelected,
-    templateVars.body,
-    templateVars.header,
-    templateButtonVars,
+    selectedTestContact?.id,
+    configuredContact?.id,
+    combineMode,
+    selectedTags.join(','),
+    selectedCountries.join(','),
+    selectedStates.join(','),
+    templateVars.header.map((item) => item.value).join('|'),
+    templateVars.body.map((item) => item.value).join('|'),
+    Object.entries(templateButtonVars)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}:${v}`)
+      .join('|'),
   ])
-
-  useEffect(() => {
-    // Hide pre-check panel when the audience context changes.
-    setShowPrecheckPanel(false)
-  }, [precheckContextKey])
 
   const baseCount = statsQuery.data?.total ?? 0
   const segmentEstimate = segmentCountQuery.data?.matched ?? baseCount
@@ -1133,24 +1127,22 @@ export default function CampaignsNewRealPage() {
   const isAudienceComplete = audienceMode === 'teste' ? selectedTestCount > 0 : audienceCount > 0
   const precheckNeedsFix =
     Boolean(precheckTotals && precheckTotals.skipped > 0) && (fixCandidates.length > 0 || bulkKeys.length > 0)
-  const isPrecheckBlocked =
-    lastPrecheckKey === precheckContextKey &&
-    (precheckNeedsFix || isPrecheckLoading || Boolean(precheckError))
-  const shouldShowPrecheckPanel =
-    step === 2 &&
-    showPrecheckPanel &&
-    lastPrecheckKey === precheckContextKey &&
-    (isPrecheckLoading || precheckError || (precheckTotals?.skipped ?? 0) > 0)
+  const isPrecheckOk =
+    Boolean(precheckTotals) &&
+    !precheckError &&
+    !isPrecheckLoading &&
+    (precheckTotals?.valid ?? 0) > 0 &&
+    !precheckNeedsFix
   const isScheduleComplete =
     scheduleMode !== 'agendar' || (scheduleDate.trim().length > 0 && scheduleTime.trim().length > 0)
   const canContinue =
-    step === 1 ? isConfigComplete : step === 2 ? isAudienceComplete && !isPrecheckBlocked : isScheduleComplete
+    step === 1 ? isConfigComplete : step === 2 ? isAudienceComplete : step === 3 ? isPrecheckOk : isScheduleComplete
   const scheduleLabel = scheduleMode === 'agendar' ? 'Agendado' : 'Imediato'
   const scheduleSummaryLabel =
-    step >= 3
+    step >= 4
       ? scheduleLabel
-      : isPrecheckBlocked
-        ? 'Bloqueado (pre-check pendente)'
+      : precheckNeedsFix
+        ? 'Bloqueado (validacao pendente)'
         : 'A definir'
   const combineModeLabel = combineMode === 'or' ? 'Mais alcance' : 'Mais preciso'
   const combineFilters = [...selectedTags, ...selectedCountries, ...selectedStates]
@@ -1247,12 +1239,13 @@ export default function CampaignsNewRealPage() {
 
       <div className="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {steps.map((item) => {
               const isStepEnabled =
                 item.id === 1 ||
                 (item.id === 2 && isConfigComplete) ||
-                (item.id === 3 && isConfigComplete && isAudienceComplete && !isPrecheckBlocked)
+                (item.id === 3 && isConfigComplete && isAudienceComplete) ||
+                (item.id === 4 && isConfigComplete && isAudienceComplete && isPrecheckOk)
               return (
                 <button
                   key={item.id}
@@ -1267,9 +1260,9 @@ export default function CampaignsNewRealPage() {
                       ? undefined
                       : item.id === 2
                         ? 'Complete a configuracao para avancar'
-                        : isPrecheckBlocked
-                          ? 'Resolva o pre-check pendente para avancar'
-                          : 'Complete configuracao e publico para avancar'
+                        : item.id === 3
+                          ? 'Complete configuracao e publico para avancar'
+                          : 'Finalize a validacao para avancar'
                   }
                   className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition ${
                     step === item.id
@@ -1840,7 +1833,7 @@ export default function CampaignsNewRealPage() {
                 )}
               </div>
 
-              {audienceMode === 'todos' && !shouldShowPrecheckPanel && (
+              {audienceMode === 'todos' && (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                   <div className="space-y-1">
                     <h2 className="text-lg font-semibold text-white">Todos os contatos</h2>
@@ -1866,7 +1859,7 @@ export default function CampaignsNewRealPage() {
                 </div>
               )}
 
-              {audienceMode === 'segmentos' && !shouldShowPrecheckPanel && (
+              {audienceMode === 'segmentos' && (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                   <Sheet open={showStatesPanel} onOpenChange={setShowStatesPanel}>
                     <SheetContent className="w-full border-l border-white/10 bg-zinc-950 p-0 sm:max-w-md">
@@ -2116,7 +2109,7 @@ export default function CampaignsNewRealPage() {
                 </div>
               )}
 
-              {audienceMode === 'teste' && !shouldShowPrecheckPanel && (
+              {audienceMode === 'teste' && (
                 <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                   <div className="space-y-1">
                     <h2 className="text-lg font-semibold text-white">Contato de teste</h2>
@@ -2219,11 +2212,11 @@ export default function CampaignsNewRealPage() {
             </div>
           )}
 
-          {shouldShowPrecheckPanel && (
+          {step === 3 && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                 <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-white">Pre-check de destinatarios</h2>
+                  <h2 className="text-lg font-semibold text-white">Validacao de destinatarios</h2>
                   <p className="text-sm text-gray-500">Validacao automatica antes do disparo.</p>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -2262,7 +2255,7 @@ export default function CampaignsNewRealPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-white">Corrigir ignorados</p>
                         <p className="text-xs text-gray-500">
-                          Alguns contatos estao sendo ignorados por falta de Nome, Email ou campo personalizado. Corrija e o pre-check destrava.
+                          Alguns contatos estao sendo ignorados por falta de Nome, Email ou campo personalizado. Corrija e a validacao destrava.
                         </p>
                       </div>
                       <div className="flex items-center justify-end gap-2 sm:flex-nowrap">
@@ -2434,7 +2427,7 @@ export default function CampaignsNewRealPage() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
                 <div className="space-y-1">
@@ -2516,7 +2509,7 @@ export default function CampaignsNewRealPage() {
                       <DateTimePicker value={scheduleTime} onChange={(value) => setScheduleTime(value)} disabled={scheduleMode !== 'agendar'} />
                     </div>
                   </div>
-                  <p className="mt-3 text-xs text-gray-500">Fuso fixo: America/Sao_Paulo.</p>
+                  <p className="mt-3 text-xs text-gray-500">Fuso do navegador: {userTimeZone || 'Local'}.</p>
                 </div>
               </div>
             </div>
@@ -2576,10 +2569,10 @@ export default function CampaignsNewRealPage() {
                   <>Defina o nome da campanha</>
                 )}
                 {step === 2 && !isAudienceComplete && 'Selecione um publico valido'}
-                {step === 2 && isPrecheckLoading && 'Validando destinatarios...'}
-                {step === 2 && !isPrecheckLoading && precheckNeedsFix && 'Corrija os ignorados do pre-check para continuar'}
-                {step === 2 && !isPrecheckLoading && precheckTotals && (precheckTotals.valid ?? 0) === 0 && 'Nenhum destinatario valido — corrija os ignorados'}
-                {step === 3 && !isScheduleComplete && 'Defina data e horario do agendamento'}
+                {step === 3 && isPrecheckLoading && 'Validando destinatarios...'}
+                {step === 3 && !isPrecheckLoading && precheckNeedsFix && 'Corrija os ignorados da validacao para continuar'}
+                {step === 3 && !isPrecheckLoading && precheckTotals && (precheckTotals.valid ?? 0) === 0 && 'Nenhum destinatario valido — corrija os ignorados'}
+                {step === 4 && !isScheduleComplete && 'Defina data e horario do agendamento'}
                 {canContinue && footerSummary}
               </div>
               <button
@@ -2594,8 +2587,16 @@ export default function CampaignsNewRealPage() {
                     const totals = result?.totals
                     const skipped = totals?.skipped ?? 0
                     const valid = totals?.valid ?? 0
-                    if (!result || skipped > 0 || valid === 0) return
-                    setStep(3)
+                    if (!result || skipped > 0 || valid === 0) {
+                      setStep(3)
+                      return
+                    }
+                    setStep(4)
+                    return
+                  }
+                  if (step === 3) {
+                    if (!isPrecheckOk) return
+                    setStep(4)
                     return
                   }
                   handleLaunch()
@@ -2607,7 +2608,7 @@ export default function CampaignsNewRealPage() {
                 }`}
                 disabled={!canContinue || isLaunching}
               >
-                {step < 3 ? 'Continuar' : isLaunching ? 'Lancando...' : 'Lancar campanha'}
+                {step < 4 ? 'Continuar' : isLaunching ? 'Lancando...' : 'Lancar campanha'}
               </button>
             </div>
             {launchError && (

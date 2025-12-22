@@ -73,6 +73,14 @@ const parsePickerDate = (value: string) => {
   return new Date(y, m - 1, d, 12, 0, 0)
 }
 
+const buildScheduledAt = (date: string, time: string) => {
+  if (!date || !time) return undefined
+  const [year, month, day] = date.split('-').map((v) => Number(v))
+  const [hour, minute] = time.split(':').map((v) => Number(v))
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) return undefined
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString()
+}
+
 type Contact = {
   id: string
   name: string
@@ -149,6 +157,7 @@ export default function CampaignsNewRealPage() {
   const [isFieldsSheetOpen, setIsFieldsSheetOpen] = useState(false)
   const [scheduleDate, setScheduleDate] = useState(() => new Date().toLocaleDateString('en-CA'))
   const [scheduleTime, setScheduleTime] = useState(() => getDefaultScheduleTime())
+  const userTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
   const [templateVars, setTemplateVars] = useState<{ header: TemplateVar[]; body: TemplateVar[] }>({
     header: [],
@@ -617,7 +626,7 @@ export default function CampaignsNewRealPage() {
 
       const scheduledAt =
         scheduleMode === 'agendar' && scheduleDate && scheduleTime
-          ? new Date(`${scheduleDate}T${scheduleTime}`).toISOString()
+          ? buildScheduledAt(scheduleDate, scheduleTime)
           : undefined
 
       const campaign = await campaignService.create({
@@ -2510,7 +2519,7 @@ export default function CampaignsNewRealPage() {
                       <DateTimePicker value={scheduleTime} onChange={(value) => setScheduleTime(value)} disabled={scheduleMode !== 'agendar'} />
                     </div>
                   </div>
-                  <p className="mt-3 text-xs text-gray-500">Fuso fixo: America/Sao_Paulo.</p>
+                  <p className="mt-3 text-xs text-gray-500">Fuso do navegador: {userTimeZone || 'Local'}.</p>
                 </div>
               </div>
             </div>

@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: SmartZap Setup & Schema Validation API
+  version: 0.1.0
+  description: |
+    Contratos (documentação) para rotas de setup/migração e validação de schema.
+    
+    Observação: este documento descreve rotas existentes e uma rota proposta para
+    suportar testes automatizados de equivalência de schema.
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: localhost:3000
+paths:
+  /api/setup/migrate:
+    post:
+      summary: Aplica migrations (wizard)
+      description: |
+        Executa ações de setup no banco.
+        Implementação atual: concatena migrations da pasta canônica e executa via `pg`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [check, migrate, reset]
+                  description: |
+                    - check: valida conectividade/estado
+                    - migrate: aplica migrations
+                    - reset: drop/recreate schema public (apenas dev)
+      responses:
+        '200':
+          description: Resultado do comando
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: Requisição inválida
+        '500':
+          description: Erro interno
+  /api/setup/validate-schema:
+    post:
+      summary: Valida equivalência de schema (proposto)
+      description: |
+        Endpoint proposto para rodar validação de equivalência (baseline vs full chain)
+        e retornar um relatório legível.
+        
+        Pode ser implementado como rota interna (protegida) ou substituído por script
+        de CI sem endpoint público.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [baseline-vs-full]
+                includeSchemas:
+                  type: array
+                  items:
+                    type: string
+                  description: Lista de schemas a considerar (ex.: ["public", "storage"]).
+                includeCatalogSnapshots:
+                  type: boolean
+                  default: true
+                strict:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Relatório de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationReport'
+        '400':
+          description: Parâmetros inválidos
+        '500':
+          description: Erro interno
+components:
+  schemas:
+    ValidationReport:
+      type: object
+      additionalProperties: false
+      required: [status, summary, diffs]
+      properties:
+        status:
+          type: string
+          enum: [pass, fail]
+        summary:
+          type: string
+        diffs:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [area, details]
+            properties:
+              area:
+                type: string
+                description: Ex.: ddl, publications, policies, buckets, grants
+              details:
+                type: string
+        artifacts:
+          type: object
+          additionalProperties: false
+          properties:
+            baselineDumpPath:
+              type: string
+            fullDumpPath:
+              type: string
+            diffPath:
+              type: string

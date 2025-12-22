@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 const steps = [
   { id: 1, label: 'Configuracao' },
@@ -67,6 +67,7 @@ export default function CampaignsNewMockPage() {
       { id: '{{2}}', key: 'teste', required: true },
     ],
   })
+  const userTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
 
   const selectedTestCount = Number(sendToConfigured) + Number(sendToSelected)
   const audienceCount =
@@ -975,7 +976,7 @@ export default function CampaignsNewMockPage() {
                       />
                     </div>
                   </div>
-                  <p className="mt-3 text-xs text-gray-500">Fuso fixo: America/Sao_Paulo.</p>
+                  <p className="mt-3 text-xs text-gray-500">Fuso do navegador: {userTimeZone || 'Local'}.</p>
                 </div>
               </div>
             </div>
