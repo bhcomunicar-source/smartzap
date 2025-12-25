@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
 type RouteParams = {
-  params: { workflowId: string };
+  params: Promise<{ workflowId: string }>;
 };
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const { workflowId } = await params;
   return NextResponse.json({
-    code: `export async function workflow${params.workflowId}() {\n  "use workflow";\n}\n`,
+    code: `export async function workflow${workflowId}() {\n  "use workflow";\n}\n`,
     workflowName: "Workflow",
   });
 }

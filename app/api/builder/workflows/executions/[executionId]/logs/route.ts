@@ -3,10 +3,11 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { ensureWorkflow } from "@/lib/builder/mock-workflow-store";
 
 type RouteParams = {
-  params: { executionId: string };
+  params: Promise<{ executionId: string }>;
 };
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const { executionId } = await params;
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ execution: null, logs: [] });
@@ -15,7 +16,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const { data: execution, error: execError } = await supabase
     .from("workflow_builder_executions")
     .select("*")
-    .eq("id", params.executionId)
+    .eq("id", executionId)
     .single();
 
   if (execError || !execution) {
@@ -25,7 +26,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const { data: logs } = await supabase
     .from("workflow_builder_logs")
     .select("*")
-    .eq("execution_id", params.executionId)
+    .eq("execution_id", executionId)
     .order("started_at", { ascending: true });
 
   const workflow = ensureWorkflow(execution.workflow_id);

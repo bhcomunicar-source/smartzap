@@ -53,7 +53,7 @@ function mapIntegrationConfig(
   // Look up plugin from registry and auto-generate credential mapping
   const plugin = getIntegration(integrationType);
   if (plugin) {
-    return getCredentialMapping(plugin, config);
+    return getCredentialMapping(integrationType) as WorkflowCredentials;
   }
 
   // Fallback for unknown integrations

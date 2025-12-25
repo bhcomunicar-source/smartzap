@@ -13,7 +13,7 @@ export const WorkflowNodeSchema = z.object({
     label: z.string().default(""),
     description: z.string().optional(),
     type: WorkflowNodeTypeSchema,
-    config: z.record(z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
     status: z.enum(["idle", "running", "success", "error"]).optional(),
     enabled: z.boolean().optional(),
   }),
@@ -39,7 +39,7 @@ export const WorkflowSchema = z.object({
 export function validateWorkflowSchema(input: unknown) {
   let parsed:
     | { success: true; data: z.infer<typeof WorkflowSchema> }
-    | { success: false; errors: z.typeToFlattenedError<unknown> };
+    | { success: false; errors: ReturnType<z.ZodError<unknown>["flatten"]> };
 
   try {
     const result = WorkflowSchema.safeParse(input);

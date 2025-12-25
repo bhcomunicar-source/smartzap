@@ -231,7 +231,10 @@ async function executeActionStep(input: {
   // Special handling for Condition action - needs template evaluation
   if (actionType === "Condition") {
     const systemAction = SYSTEM_ACTIONS.Condition;
-    const module = await systemAction.importer();
+    const module = (await systemAction.importer()) as Record<
+      string,
+      (input: Record<string, unknown>) => Promise<unknown>
+    >;
     const originalExpression = stepInput.condition;
     const { result: evaluatedCondition, resolvedValues } =
       evaluateConditionExpression(originalExpression, outputs);
@@ -251,7 +254,10 @@ async function executeActionStep(input: {
   // Check system actions first (Database Query, HTTP Request)
   const systemAction = SYSTEM_ACTIONS[actionType];
   if (systemAction) {
-    const module = await systemAction.importer();
+    const module = (await systemAction.importer()) as Record<
+      string,
+      (input: Record<string, unknown>) => Promise<unknown>
+    >;
     const stepFunction = module[systemAction.stepFunction];
     return await stepFunction(stepInput);
   }
@@ -259,7 +265,10 @@ async function executeActionStep(input: {
   // Look up plugin action from the generated step registry
   const stepImporter = getStepImporter(actionType);
   if (stepImporter) {
-    const module = await stepImporter.importer();
+    const module = (await stepImporter.importer()) as Record<
+      string,
+      (input: Record<string, unknown>) => Promise<unknown>
+    >;
     const stepFunction = module[stepImporter.stepFunction];
     if (stepFunction) {
       return await stepFunction(stepInput);

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 type RouteParams = {
-  params: { executionId: string };
+  params: Promise<{ executionId: string }>;
 };
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const { executionId } = await params;
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ status: "unknown", nodeStatuses: [] });
@@ -14,13 +15,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const { data: execution } = await supabase
     .from("workflow_builder_executions")
     .select("status")
-    .eq("id", params.executionId)
+    .eq("id", executionId)
     .single();
 
   const { data: logs } = await supabase
     .from("workflow_builder_logs")
     .select("node_id,status,started_at")
-    .eq("execution_id", params.executionId);
+    .eq("execution_id", executionId);
 
   const nodeStatuses = new Map<string, { status: string; started_at: string }>();
   for (const log of logs || []) {

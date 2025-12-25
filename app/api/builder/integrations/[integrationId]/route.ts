@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
 type RouteParams = {
-  params: { integrationId: string };
+  params: Promise<{ integrationId: string }>;
 };
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  const { integrationId } = await params;
   return NextResponse.json({
-    id: params.integrationId,
+    id: integrationId,
     name: "Integration",
     type: "custom",
     config: {},
@@ -14,8 +15,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 }
 
 export async function PUT(_request: Request, { params }: RouteParams) {
+  const { integrationId } = await params;
   return NextResponse.json({
-    id: params.integrationId,
+    id: integrationId,
     name: "Integration",
     type: "custom",
     config: {},

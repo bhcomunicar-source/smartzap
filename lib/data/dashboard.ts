@@ -55,7 +55,10 @@ export async function getDashboardStatsServer(): Promise<{ stats: DashboardStats
     const chartData: ChartDataPoint[] = campaigns.slice(0, 7).map(c => ({
         name: c.name?.substring(0, 3) || '?',
         sent: c.recipients || 0,
-        read: c.read || 0
+        read: c.read || 0,
+        delivered: c.delivered || 0,
+        failed: c.failed || 0,
+        active: c.status === 'Enviando' || c.status === 'Agendado' ? 1 : 0
     })).reverse()
 
     return {

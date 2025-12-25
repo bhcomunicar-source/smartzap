@@ -1,12 +1,9 @@
 /**
- * Server-only workflow logging functions
- * These replace the HTTP endpoint for better security
+ * Server-only workflow logging functions (Supabase-backed)
  */
 import "server-only";
 
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/builder/db";
-import { workflowExecutionLogs, workflowExecutions } from "@/lib/builder/db/schema";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export type LogStepStartParams = {
   executionId: string;
@@ -21,27 +18,30 @@ export type LogStepStartResult = {
   startTime: number;
 };
 
-/**
- * Log the start of a step execution
- */
 export async function logStepStartDb(
   params: LogStepStartParams
 ): Promise<LogStepStartResult> {
-  const [log] = await db
-    .insert(workflowExecutionLogs)
-    .values({
-      executionId: params.executionId,
-      nodeId: params.nodeId,
-      nodeName: params.nodeName,
-      nodeType: params.nodeType,
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return { logId: "", startTime: Date.now() };
+  }
+
+  const { data } = await supabase
+    .from("workflow_builder_logs")
+    .insert({
+      execution_id: params.executionId,
+      node_id: params.nodeId,
+      node_name: params.nodeName,
+      node_type: params.nodeType,
       status: "running",
-      input: params.input,
-      startedAt: new Date(),
+      input: params.input ?? null,
+      started_at: new Date().toISOString(),
     })
-    .returning();
+    .select("id")
+    .maybeSingle();
 
   return {
-    logId: log.id,
+    logId: data?.id ? String(data.id) : "",
     startTime: Date.now(),
   };
 }
@@ -54,24 +54,22 @@ export type LogStepCompleteParams = {
   error?: string;
 };
 
-/**
- * Log the completion of a step execution
- */
 export async function logStepCompleteDb(
   params: LogStepCompleteParams
 ): Promise<void> {
-  const duration = Date.now() - params.startTime;
+  if (!params.logId) return;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
 
-  await db
-    .update(workflowExecutionLogs)
-    .set({
+  await supabase
+    .from("workflow_builder_logs")
+    .update({
       status: params.status,
-      output: params.output,
-      error: params.error,
-      completedAt: new Date(),
-      duration: duration.toString(),
+      output: params.output ?? null,
+      error: params.error ?? null,
+      completed_at: new Date().toISOString(),
     })
-    .where(eq(workflowExecutionLogs.id, params.logId));
+    .eq("id", params.logId);
 }
 
 export type LogWorkflowCompleteParams = {
@@ -82,22 +80,19 @@ export type LogWorkflowCompleteParams = {
   startTime: number;
 };
 
-/**
- * Log the completion of a workflow execution
- */
 export async function logWorkflowCompleteDb(
   params: LogWorkflowCompleteParams
 ): Promise<void> {
-  const duration = Date.now() - params.startTime;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
 
-  await db
-    .update(workflowExecutions)
-    .set({
+  await supabase
+    .from("workflow_builder_executions")
+    .update({
       status: params.status,
-      output: params.output,
-      error: params.error,
-      completedAt: new Date(),
-      duration: duration.toString(),
+      output: params.output ?? null,
+      error: params.error ?? null,
+      finished_at: new Date().toISOString(),
     })
-    .where(eq(workflowExecutions.id, params.executionId));
+    .eq("id", params.executionId);
 }

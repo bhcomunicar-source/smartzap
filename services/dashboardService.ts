@@ -51,7 +51,11 @@ export const dashboardService = {
       ? await statsResponse.json() 
       : { totalSent: 0, totalDelivered: 0, totalRead: 0, totalFailed: 0, activeCampaigns: 0, deliveryRate: 0 };
     
-    const campaigns: Campaign[] = Array.isArray(campaignsResult) ? campaignsResult : (campaignsResult?.data || []);
+    const campaignsPayload =
+      campaignsResult as unknown as Campaign[] | { data?: Campaign[] };
+    const campaigns: Campaign[] = Array.isArray(campaignsPayload)
+      ? campaignsPayload
+      : campaignsPayload?.data || [];
 
     const today = new Date();
     const start = new Date(today);

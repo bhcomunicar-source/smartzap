@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { deleteApiKey } from "@/lib/builder/mock-api-keys";
 
 type RouteParams = {
-  params: { keyId: string };
+  params: Promise<{ keyId: string }>;
 };
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
-  deleteApiKey(params.keyId);
+  const { keyId } = await params;
+  deleteApiKey(keyId);
   return NextResponse.json({ success: true });
 }

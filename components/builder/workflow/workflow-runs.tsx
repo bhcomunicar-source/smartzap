@@ -63,7 +63,9 @@ type WorkflowRunsProps = {
 
 // Helper to get the output display config for a node type
 function getOutputConfig(nodeType: string): OutputDisplayConfig | undefined {
-  return OUTPUT_DISPLAY_CONFIGS[nodeType];
+  return OUTPUT_DISPLAY_CONFIGS.find(
+    (config) => config.actionType === nodeType
+  );
 }
 
 // Helper to extract the displayable value from output based on config
@@ -279,9 +281,9 @@ function OutputDisplay({
   // Fall back to auto-generated config for legacy support (only built-in types)
   const builtInConfig = actionType ? getOutputConfig(actionType) : undefined;
 
-  // Get the effective built-in config (plugin config if not component, else auto-generated)
+  // Get the effective built-in config (only plugin configs with direct fields)
   const effectiveBuiltInConfig =
-    pluginConfig?.type !== "component" ? pluginConfig : builtInConfig;
+    pluginConfig && pluginConfig.type !== "component" ? pluginConfig : undefined;
 
   // Get display value for built-in types (image/video/url)
   const displayValue = effectiveBuiltInConfig
@@ -290,7 +292,7 @@ function OutputDisplay({
 
   // Check for legacy base64 image
   const isLegacyBase64 =
-    !(pluginConfig || builtInConfig) && isBase64ImageOutput(output);
+    !pluginConfig && !builtInConfig && isBase64ImageOutput(output);
 
   const renderRichResult = () => {
     // Priority 1: Custom component from plugin outputConfig

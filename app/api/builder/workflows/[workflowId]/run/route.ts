@@ -3,11 +3,12 @@ import { ensureWorkflow } from "@/lib/builder/mock-workflow-store";
 import { validateWorkflowSchema } from "@/lib/shared/workflow-schema";
 
 type RouteParams = {
-  params: { workflowId: string };
+  params: Promise<{ workflowId: string }>;
 };
 
 export async function POST(_request: Request, { params }: RouteParams) {
-  const workflow = ensureWorkflow(params.workflowId);
+  const { workflowId } = await params;
+  const workflow = ensureWorkflow(workflowId);
   const validation = validateWorkflowSchema(workflow);
   if (!validation.success) {
     return NextResponse.json(
@@ -18,7 +19,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
   return NextResponse.json({
     status: "queued",
-    workflowId: params.workflowId,
+    workflowId,
     executionId: `exec_${Date.now()}`,
   });
 }

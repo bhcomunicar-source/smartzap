@@ -8,6 +8,11 @@ import {
   validateWorkflowSchema,
   WorkflowNodeTypeSchema,
 } from "@/lib/shared/workflow-schema";
+import type {
+  WorkflowEdge,
+  WorkflowNode,
+} from "@/lib/builder/workflow-store";
+import type { WorkflowVisibility } from "@/lib/builder/api-client";
 
 type RouteParams = {
   params: Promise<{ workflowId: string }>;
@@ -47,10 +52,10 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 }
 
 function normalizeWorkflowPatch(body: Record<string, unknown>) {
-  const nodes = Array.isArray(body?.nodes)
+  const nodes: WorkflowNode[] = Array.isArray(body?.nodes)
     ? body.nodes.map((node) => normalizeNode(node))
     : [];
-  const edges = Array.isArray(body?.edges)
+  const edges: WorkflowEdge[] = Array.isArray(body?.edges)
     ? body.edges.map((edge) => normalizeEdge(edge))
     : [];
 
@@ -62,12 +67,12 @@ function normalizeWorkflowPatch(body: Record<string, unknown>) {
     edges,
     visibility:
       body?.visibility === "private" || body?.visibility === "public"
-        ? body.visibility
+        ? (body.visibility as WorkflowVisibility)
         : undefined,
   };
 }
 
-function normalizeNode(node: unknown) {
+function normalizeNode(node: unknown): WorkflowNode {
   const data = (node as { data?: Record<string, unknown> } | null)?.data ?? {};
   const rawType = (node as { type?: unknown } | null)?.type;
   const fallbackType = data?.type;
@@ -92,7 +97,7 @@ function normalizeNode(node: unknown) {
       type,
       config:
         typeof data.config === "object" && data.config !== null
-          ? data.config
+          ? (data.config as Record<string, unknown>)
           : undefined,
       status:
         data.status === "idle" ||
@@ -107,10 +112,10 @@ function normalizeNode(node: unknown) {
       typeof (node as { selected?: unknown } | null)?.selected === "boolean"
         ? (node as { selected?: boolean }).selected
         : undefined,
-  };
+  } as WorkflowNode;
 }
 
-function normalizeEdge(edge: unknown) {
+function normalizeEdge(edge: unknown): WorkflowEdge {
   return {
     id: String((edge as { id?: unknown } | null)?.id ?? ""),
     source: String((edge as { source?: unknown } | null)?.source ?? ""),
@@ -119,5 +124,5 @@ function normalizeEdge(edge: unknown) {
       typeof (edge as { type?: unknown } | null)?.type === "string"
         ? (edge as { type?: string }).type
         : undefined,
-  };
+  } as WorkflowEdge;
 }

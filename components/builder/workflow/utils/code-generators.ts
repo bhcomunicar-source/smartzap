@@ -76,9 +76,12 @@ function generateActionCode(actionType: string | undefined): string {
   // Look up plugin actions in registry
   const action = findActionById(actionType);
   if (action) {
+    const autoTemplate = AUTO_GENERATED_TEMPLATES.find(
+      (template) => template.key === action.id
+    )?.template;
     // Prefer auto-generated templates, fall back to manual templates
     return (
-      AUTO_GENERATED_TEMPLATES[action.id] ||
+      autoTemplate ||
       action.codegenTemplate ||
       FALLBACK_ACTION_CODE
     );

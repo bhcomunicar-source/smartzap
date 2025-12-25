@@ -7,9 +7,37 @@ type AuthSession = {
 } | null;
 
 export const authClient = {
-  signIn: async () => ({ success: true }),
+  signIn: {
+    email: async (_input?: {
+      email?: string;
+      password?: string;
+    }) =>
+      ({
+        success: true,
+        error: null as { message?: string } | null,
+      }),
+    social: async (_input?: {
+      provider?: string;
+      callbackURL?: string;
+    }) =>
+      ({
+        success: true,
+        error: null as { message?: string } | null,
+      }),
+    anonymous: async () => ({ success: true }),
+  },
   signOut: async () => ({ success: true }),
-  signUp: async () => ({ success: true }),
+  signUp: {
+    email: async (_input?: {
+      email?: string;
+      password?: string;
+      name?: string;
+    }) =>
+      ({
+        success: true,
+        error: null as { message?: string } | null,
+      }),
+  },
 };
 
 export const signIn = authClient.signIn;
