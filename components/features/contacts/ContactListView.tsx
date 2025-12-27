@@ -772,7 +772,13 @@ export const ContactListView: React.FC<ContactListViewProps> = ({
           <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white">Novo Contato</h2>
-              <button onClick={() => setIsAddModalOpen(false)}><X className="text-gray-500 hover:text-white" /></button>
+              <button
+                type="button"
+                aria-label="Fechar formulário de novo contato"
+                onClick={() => setIsAddModalOpen(false)}
+              >
+                <X className="text-gray-500 hover:text-white" />
+              </button>
             </div>
             <div className="space-y-4">
               <div>
@@ -873,7 +879,13 @@ export const ContactListView: React.FC<ContactListViewProps> = ({
           <div className="bg-zinc-950 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-white">Editar Contato</h2>
-              <button onClick={() => setIsEditModalOpen(false)}><X className="text-gray-500 hover:text-white" /></button>
+              <button
+                type="button"
+                aria-label="Fechar formulário de edição de contato"
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                <X className="text-gray-500 hover:text-white" />
+              </button>
             </div>
             <div className="space-y-4">
               <div>
@@ -1031,7 +1043,13 @@ export const ContactListView: React.FC<ContactListViewProps> = ({
                 <h2 className="text-2xl font-bold text-white mb-1">Importar Contatos</h2>
                 <p className="text-sm text-gray-400">Adicione múltiplos contatos de uma vez via CSV</p>
               </div>
-              <button onClick={resetImport}><X className="text-gray-500 hover:text-white" /></button>
+              <button
+                type="button"
+                aria-label="Fechar importação de contatos"
+                onClick={resetImport}
+              >
+                <X className="text-gray-500 hover:text-white" />
+              </button>
             </div>
 
             {/* Steps */}
