@@ -267,7 +267,10 @@ export default function CampaignsNewRealPage() {
   const contactSearchQuery = useQuery({
     queryKey: ['contacts-search', testContactSearch],
     queryFn: async () => {
-      const res = await fetchJson<{ data: Contact[] }>('/api/contacts?limit=5&search=' + encodeURIComponent(testContactSearch))
+      // Importante: o backend ordena por created_at desc.
+      // Usamos um limit maior e ordenamos no client (A-Z) para evitar que contatos antigos
+      // (ex.: "Thais") fiquem de fora quando há muitos matches.
+      const res = await fetchJson<{ data: Contact[] }>('/api/contacts?limit=25&search=' + encodeURIComponent(testContactSearch))
       return res.data || []
     },
     enabled: testContactSearch.trim().length >= 2,
@@ -291,6 +294,15 @@ export default function CampaignsNewRealPage() {
   const contactSearchResults = contactSearchQuery.data || []
 
   const sortedContactSearchResults = useMemo(() => {
+    const normalizeForSearch = (value: string) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+
+    const query = normalizeForSearch(testContactSearch)
+
     const getKey = (c: Contact) => {
       const name = String(c?.name || '').trim()
       const email = String(c?.email || '').trim()
@@ -299,7 +311,31 @@ export default function CampaignsNewRealPage() {
       return (name || email || phone || '').toLowerCase()
     }
 
+    const getMatchRank = (c: Contact) => {
+      if (!query) return 1
+
+      const name = normalizeForSearch(String(c?.name || ''))
+      const email = normalizeForSearch(String(c?.email || ''))
+      const phone = normalizeForSearch(String(c?.phone || ''))
+
+      const nameTokens = name.split(/[^a-z0-9]+/g).filter(Boolean)
+      const emailTokens = email.split(/[^a-z0-9]+/g).filter(Boolean)
+      const phoneTokens = phone.split(/[^a-z0-9]+/g).filter(Boolean)
+      const tokens = [...nameTokens, ...emailTokens, ...phoneTokens]
+
+      // 0 = começa com (melhor)
+      if (tokens.some((t) => t.startsWith(query))) return 0
+      // 1 = contém
+      if (name.includes(query) || email.includes(query) || phone.includes(query)) return 1
+      // 2 = não deveria acontecer (pois o backend já filtra), mas mantemos por segurança
+      return 2
+    }
+
     return [...contactSearchResults].sort((a, b) => {
+      const ra = getMatchRank(a)
+      const rb = getMatchRank(b)
+      if (ra !== rb) return ra - rb
+
       const ka = getKey(a)
       const kb = getKey(b)
       const byName = ka.localeCompare(kb, 'pt-BR', { sensitivity: 'base' })
@@ -307,7 +343,7 @@ export default function CampaignsNewRealPage() {
       // Garantir estabilidade quando chaves são iguais
       return String(a.id).localeCompare(String(b.id), 'pt-BR')
     })
-  }, [contactSearchResults])
+  }, [contactSearchResults, testContactSearch])
 
   const displayTestContacts = useMemo(() => {
     if (!selectedTestContact) return sortedContactSearchResults
