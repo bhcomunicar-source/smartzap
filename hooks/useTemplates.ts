@@ -528,6 +528,8 @@ export const useTemplatesController = () => {
         header: details.header,
         footer: details.footer,
         buttons: details.buttons,
+        headerMediaPreviewUrl: details.headerMediaPreviewUrl || null,
+        headerMediaPreviewExpiresAt: details.headerMediaPreviewExpiresAt || null,
         qualityScore: details.qualityScore,
         rejectedReason: details.rejectedReason
       });
