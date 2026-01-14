@@ -277,7 +277,13 @@ export default function TemplatesPage() {
       </div>
 
       {activeTab === 'meta' && (
-        <TemplateListView {...controller} hideHeader />
+        <TemplateListView
+          {...controller}
+          hideHeader
+          onCreateCampaign={(template) => {
+            router.push(`/campaigns/new?templateName=${encodeURIComponent(template.name)}`)
+          }}
+        />
       )}
 
       {activeTab === 'flows' && (

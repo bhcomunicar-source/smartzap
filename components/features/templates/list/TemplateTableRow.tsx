@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FileText, Check, Loader2, Trash2, Eye, Pencil, Send } from 'lucide-react';
+import { FileText, Check, Loader2, Trash2, Eye, Pencil, Send, Megaphone } from 'lucide-react';
 import { Template } from '../../../../types';
 import { StatusBadge } from './StatusBadge';
 
@@ -21,6 +21,7 @@ export interface TemplateTableRowProps {
   onDeleteClick: () => void;
   onSubmitDraft: () => void;
   onDeleteDraft: () => void;
+  onCreateCampaign?: () => void;
   // Hover handlers
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -40,6 +41,7 @@ export const TemplateTableRow: React.FC<TemplateTableRowProps> = ({
   onDeleteClick,
   onSubmitDraft,
   onDeleteDraft,
+  onCreateCampaign,
   onMouseEnter,
   onMouseLeave,
   onPrefetchPreview,
@@ -246,6 +248,15 @@ export const TemplateTableRow: React.FC<TemplateTableRowProps> = ({
               >
                 <Eye size={16} />
               </button>
+              {template.status === 'APPROVED' && onCreateCampaign && (
+                <button
+                  onClick={onCreateCampaign}
+                  className="p-2 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                  title="Criar campanha com este template"
+                >
+                  <Megaphone size={16} />
+                </button>
+              )}
             </>
           )}
         </div>

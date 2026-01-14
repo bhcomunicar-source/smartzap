@@ -27,6 +27,7 @@ export interface TemplateTableProps {
   // Template actions
   onViewDetails: (template: Template) => void;
   onDeleteClick: (template: Template) => void;
+  onCreateCampaign?: (template: Template) => void;
   // Hover
   onHoverTemplate: (templateId: string | null) => void;
   onPrefetchPreview?: (template: Template) => void;
@@ -55,6 +56,7 @@ export const TemplateTable: React.FC<TemplateTableProps> = ({
   deleteManualDraft,
   onViewDetails,
   onDeleteClick,
+  onCreateCampaign,
   onHoverTemplate,
   onPrefetchPreview,
   onToggleAllDrafts,
@@ -166,6 +168,7 @@ export const TemplateTable: React.FC<TemplateTableProps> = ({
                     onDeleteClick={() => onDeleteClick(template)}
                     onSubmitDraft={() => submitManualDraft(template.id)}
                     onDeleteDraft={() => deleteManualDraft(template.id)}
+                    onCreateCampaign={onCreateCampaign ? () => onCreateCampaign(template) : undefined}
                     onMouseEnter={() => onHoverTemplate(template.id)}
                     onMouseLeave={() => onHoverTemplate(null)}
                     onPrefetchPreview={onPrefetchPreview ? () => onPrefetchPreview(template) : undefined}

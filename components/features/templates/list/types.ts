@@ -97,6 +97,9 @@ export interface TemplateListViewProps {
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
 
+  // Create Campaign from template
+  onCreateCampaign?: (template: Template) => void;
+
   // Multi-select & Bulk Delete
   selectedMetaTemplates: Set<string>;
   onToggleMetaTemplate: (name: string) => void;
