@@ -92,7 +92,6 @@ export function CalendarBookingPanel({
         calendarBaseUrlDraft={hook.calendarBaseUrlDraft}
         calendarBaseUrlEditing={hook.calendarBaseUrlEditing}
         calendarRedirectUrl={hook.calendarRedirectUrl}
-        calendarWebhookUrl={hook.calendarWebhookUrl}
         calendarClientIdValid={hook.calendarClientIdValid}
         calendarClientSecretValid={hook.calendarClientSecretValid}
         calendarCredsFormValid={hook.calendarCredsFormValid}
@@ -104,7 +103,6 @@ export function CalendarBookingPanel({
         handleSaveCalendarCreds={hook.handleSaveCalendarCreds}
         handleRemoveCalendarCreds={hook.handleRemoveCalendarCreds}
         handleCopyCalendarValue={hook.handleCopyCalendarValue}
-        handleCopyCalendarBundle={hook.handleCopyCalendarBundle}
         calendarConnectLoading={hook.calendarConnectLoading}
         handleConnectCalendar={hook.handleConnectCalendar}
         handleDisconnectCalendar={hook.handleDisconnectCalendar}

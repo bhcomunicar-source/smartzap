@@ -40,7 +40,6 @@ export function CalendarWizardModal({
   calendarBaseUrlDraft,
   calendarBaseUrlEditing,
   calendarRedirectUrl,
-  calendarWebhookUrl,
   calendarClientIdValid,
   calendarClientSecretValid,
   calendarCredsFormValid,
@@ -52,7 +51,6 @@ export function CalendarWizardModal({
   handleSaveCalendarCreds,
   handleRemoveCalendarCreds,
   handleCopyCalendarValue,
-  handleCopyCalendarBundle,
 
   // Step 2 props
   calendarConnectLoading,
@@ -137,7 +135,6 @@ export function CalendarWizardModal({
                 calendarBaseUrlDraft={calendarBaseUrlDraft}
                 calendarBaseUrlEditing={calendarBaseUrlEditing}
                 calendarRedirectUrl={calendarRedirectUrl}
-                calendarWebhookUrl={calendarWebhookUrl}
                 calendarClientIdValid={calendarClientIdValid}
                 calendarClientSecretValid={calendarClientSecretValid}
                 calendarCredsFormValid={calendarCredsFormValid}
@@ -149,7 +146,6 @@ export function CalendarWizardModal({
                 handleSaveCalendarCreds={handleSaveCalendarCreds}
                 handleRemoveCalendarCreds={handleRemoveCalendarCreds}
                 handleCopyCalendarValue={handleCopyCalendarValue}
-                handleCopyCalendarBundle={handleCopyCalendarBundle}
               />
             )}
 
