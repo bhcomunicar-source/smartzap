@@ -6,7 +6,6 @@
  */
 
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
-import { addDays, format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
   getCalendarConfig,
@@ -32,6 +31,7 @@ type WorkingHoursDay = {
   enabled: boolean
   start: string
   end: string
+  slots?: Array<{ start: string; end: string }>
 }
 
 type CalendarBookingConfig = {
@@ -39,6 +39,9 @@ type CalendarBookingConfig = {
   slotDurationMinutes: number
   slotBufferMinutes: number
   workingHours: WorkingHoursDay[]
+  minAdvanceHours?: number
+  maxAdvanceDays?: number
+  allowSimultaneous?: boolean
 }
 
 type ServiceType = {
@@ -50,6 +53,15 @@ type ServiceType = {
 // --- Constantes ---
 
 const WEEKDAY_KEYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const WEEKDAY_LABELS: Record<Weekday, 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'> = {
+  mon: 'Mon',
+  tue: 'Tue',
+  wed: 'Wed',
+  thu: 'Thu',
+  fri: 'Fri',
+  sat: 'Sat',
+  sun: 'Sun',
+}
 
 const DEFAULT_SERVICES: ServiceType[] = [
   { id: 'consulta', title: 'Consulta', durationMinutes: 30 },
@@ -70,6 +82,9 @@ const DEFAULT_CONFIG: CalendarBookingConfig = {
     { day: 'sat', enabled: false, start: '09:00', end: '13:00' },
     { day: 'sun', enabled: false, start: '09:00', end: '13:00' },
   ],
+  minAdvanceHours: 4,
+  maxAdvanceDays: 14,
+  allowSimultaneous: false,
 }
 
 // --- Helpers ---
@@ -80,14 +95,8 @@ async function getCalendarBookingConfig(): Promise<CalendarBookingConfig> {
   if (!raw) return DEFAULT_CONFIG
   try {
     const parsed = JSON.parse(raw)
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-endpoint-handlers.ts:84',message:'calendar_booking_config parsed',data:{hasMaxAdvanceDays:parsed?.maxAdvanceDays !== undefined,rawMaxAdvanceDays:parsed?.maxAdvanceDays,hasMinAdvanceHours:parsed?.minAdvanceHours !== undefined,rawMinAdvanceHours:parsed?.minAdvanceHours},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion agent log
     return { ...DEFAULT_CONFIG, ...parsed }
   } catch {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-endpoint-handlers.ts:88',message:'calendar_booking_config parse failed',data:{rawLength:raw?.length ?? 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion agent log
     return DEFAULT_CONFIG
   }
 }
@@ -108,18 +117,17 @@ function parseTimeToMinutes(value: string): number {
   return (hh || 0) * 60 + (mm || 0)
 }
 
+type CalendarPickerData = {
+  minDate: string
+  maxDate: string
+  includeDays: Array<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'>
+  unavailableDates: string[]
+}
+
 /**
- * Gera lista de datas disponiveis (proximos N dias uteis)
- * 
- * IMPORTANTE: Usa UTC Date para evitar problemas de timezone do servidor.
- * O servidor Vercel roda em UTC, então criamos datas em UTC e formatamos
- * usando o timezone do cliente.
- * 
- * Respeita:
- * - minAdvanceHours: pula o dia de hoje se não houver slots disponíveis
- * - maxAdvanceDays: limita quantos dias no futuro mostrar
+ * Dados para CalendarPicker (min/max e dias permitidos)
  */
-async function getAvailableDates(daysToShow: number = 14): Promise<Array<{ id: string; title: string }>> {
+async function getCalendarPickerData(): Promise<CalendarPickerData> {
   const config = await getCalendarBookingConfig()
   const timeZone = config.timezone
   const maxAdvanceDays = config.maxAdvanceDays ?? 14
@@ -127,61 +135,20 @@ async function getAvailableDates(daysToShow: number = 14): Promise<Array<{ id: s
   // Pega a data atual no timezone correto (ex: America/Sao_Paulo)
   const todayStr = formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd')
   const [year, month, day] = todayStr.split('-').map(Number)
-  
-  // Limita o número de dias a mostrar baseado em maxAdvanceDays
-  const effectiveDaysToShow = maxAdvanceDays > 0 ? Math.min(daysToShow, maxAdvanceDays) : daysToShow
-  
-  // Debug: log config
-  const enabledDays = config.workingHours.filter(d => d.enabled).map(d => d.day)
-  console.log('[getAvailableDates] Config loaded:', { 
-    timezone: timeZone, 
-    enabledDays,
-    todayStr,
-    maxAdvanceDays,
-    effectiveDaysToShow,
-  })
 
-  const dates: Array<{ id: string; title: string }> = []
-  
-  // Trabalha com offset de dias a partir de hoje
-  let dayOffset = 0
-  const maxAttempts = Math.max(60, maxAdvanceDays * 2)
+  const maxUtcDate = new Date(Date.UTC(year, month - 1, day + maxAdvanceDays, 12, 0, 0))
+  const maxDateStr = maxUtcDate.toISOString().split('T')[0]
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-endpoint-handlers.ts:145',message:'getAvailableDates start',data:{daysToShow,timezone:timeZone,maxAdvanceDays,effectiveDaysToShow,todayStr,maxAttempts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-  // #endregion agent log
+  const includeDays = config.workingHours
+    .filter((d) => d.enabled)
+    .map((d) => WEEKDAY_LABELS[d.day])
 
-  while (dates.length < effectiveDaysToShow && dayOffset < maxAttempts && dayOffset <= maxAdvanceDays) {
-    // Cria data em UTC para evitar problemas de timezone
-    const utcDate = new Date(Date.UTC(year, month - 1, day + dayOffset, 12, 0, 0))
-    const dateStr = utcDate.toISOString().split('T')[0]
-    
-    // Calcula o dia da semana em UTC (0=Dom, 1=Seg, ..., 6=Sab)
-    const jsDay = utcDate.getUTCDay()
-    // Converte para ISO (1=Mon, 7=Sun)
-    const isoDay = jsDay === 0 ? 7 : jsDay
-    const dayKey = WEEKDAY_KEYS[isoDay - 1]
-    
-    const workingDay = config.workingHours.find((d) => d.day === dayKey)
-    const isWorking = workingDay?.enabled ?? false
-    
-    if (isWorking) {
-      // Formata o display usando formatInTimeZone para garantir consistência
-      const displayStr = formatInTimeZone(utcDate, timeZone, "EEEE, d 'de' MMM", { locale: ptBR })
-      dates.push({
-        id: dateStr,
-        title: displayStr.charAt(0).toUpperCase() + displayStr.slice(1),
-      })
-    }
-    
-    dayOffset++
+  return {
+    minDate: todayStr,
+    maxDate: maxDateStr,
+    includeDays,
+    unavailableDates: [],
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'flow-endpoint-handlers.ts:171',message:'getAvailableDates result',data:{datesCount:dates.length,firstDate:dates[0]?.id,lastDate:dates[dates.length-1]?.id,dayOffsetFinal:dayOffset,maxAdvanceDays,effectiveDaysToShow},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-  // #endregion agent log
-  console.log('[getAvailableDates] Result:', dates.length, 'dates')
-  return dates
 }
 
 /**
@@ -389,14 +356,19 @@ export async function handleFlowAction(
  */
 async function handleInit(): Promise<Record<string, unknown>> {
   try {
-    const dates = await getAvailableDates(14)
+    const calendarPicker = await getCalendarPickerData()
 
     return createSuccessResponse('BOOKING_START', {
       services: DEFAULT_SERVICES.map((s) => ({ id: s.id, title: s.title })),
-      dates,
+      min_date: calendarPicker.minDate,
+      max_date: calendarPicker.maxDate,
+      include_days: calendarPicker.includeDays,
+      unavailable_dates: calendarPicker.unavailableDates,
       // Mensagens de UI
       title: 'Agendar Atendimento',
       subtitle: 'Escolha o tipo de atendimento e a data desejada',
+      error_message: '',
+      has_error: false,
     })
   } catch (error) {
     console.error('[flow-handler] INIT error:', error)
@@ -425,9 +397,15 @@ async function handleDataExchange(
         const slots = await getAvailableSlots(selectedDate)
 
         if (slots.length === 0) {
+          const calendarPicker = await getCalendarPickerData()
           return createSuccessResponse('BOOKING_START', {
             ...data,
+            min_date: calendarPicker.minDate,
+            max_date: calendarPicker.maxDate,
+            include_days: calendarPicker.includeDays,
+            unavailable_dates: calendarPicker.unavailableDates,
             error_message: 'Nenhum horario disponivel nesta data. Escolha outra data.',
+            has_error: true,
           })
         }
 

@@ -44,6 +44,17 @@ async function getWhatsAppAccessToken(): Promise<string | null> {
 // Get or generate webhook verify token (Supabase settings preferred, env var fallback)
 import { getVerifyToken } from '@/lib/verify-token'
 
+async function getCalendarTimeZone(): Promise<string | null> {
+  try {
+    const raw = await settingsDb.get('calendar_booking_config')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return typeof parsed?.timezone === 'string' ? parsed.timezone : null
+  } catch {
+    return null
+  }
+}
+
 function verifyMetaWebhookSignature(input: { request: NextRequest; rawBody: string }): boolean {
   const appSecret = String(process.env.META_APP_SECRET || '').trim()
   // Compatibility mode: if not configured, do not block (but once configured, enforce).
@@ -873,6 +884,52 @@ export async function POST(request: NextRequest) {
                 } else {
                   console.log(`🧾 Flow submission salva (message_id=${messageId}, from=${maskPhone(normalizedFrom)})`)
                 }
+              }
+
+              // Confirmação automática após conclusão do Flow
+              try {
+                const token = await getWhatsAppAccessToken()
+                if (token && phoneNumberId && normalizedFrom) {
+                  const timezone = (await getCalendarTimeZone()) || 'America/Sao_Paulo'
+                  const responseObj = (responseJson as any) || {}
+                  const selectedDate = typeof responseObj.selected_date === 'string' ? responseObj.selected_date : null
+                  const selectedSlot = typeof responseObj.selected_slot === 'string' ? responseObj.selected_slot : null
+                  const service = typeof responseObj.selected_service === 'string' ? responseObj.selected_service : null
+                  const formattedDate = selectedDate
+                    ? selectedDate.split('-').reverse().join('/')
+                    : null
+                  const formattedTime = selectedSlot
+                    ? new Intl.DateTimeFormat('pt-BR', {
+                      timeZone: timezone,
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }).format(new Date(selectedSlot))
+                    : null
+
+                  const parts = [
+                    'Agendamento confirmado ✅',
+                    service ? `Servico: ${service}` : null,
+                    formattedDate ? `Data: ${formattedDate}` : null,
+                    formattedTime ? `Horario: ${formattedTime}` : null,
+                    'Qualquer ajuste, responda esta mensagem.',
+                  ].filter(Boolean)
+
+                  await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      messaging_product: 'whatsapp',
+                      to: normalizedFrom,
+                      type: 'text',
+                      text: { body: parts.join('\n') },
+                    }),
+                  })
+
+                }
+              } catch (e) {
               }
             }
           } catch (e) {

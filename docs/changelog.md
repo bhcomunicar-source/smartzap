@@ -81,6 +81,24 @@
 - **🧯 Bloqueio quando chave não registra**
   - `app/api/flows/[id]/meta/publish/route.ts` interrompe o publish se a chave não persistir na Meta
 
+## 15/01/2026 - Agendamento (Settings + Flow)
+
+- **🧾 Persistência de regras de agendamento**
+  - `app/api/settings/calendar-booking/route.ts` agora salva e normaliza `minAdvanceHours`, `maxAdvanceDays`, `allowSimultaneous` e `slots`
+  - Garante que a UI e o Flow usem as regras corretas
+
+- **📅 Datas do Flow em formato simples**
+  - `lib/whatsapp/flow-endpoint-handlers.ts` passa a fornecer datas no formato `DD/MM/YYYY`
+  - Mantém `id` em `YYYY-MM-DD` para compatibilidade interna
+
+- **🗓️ CalendarPicker no Flow de agendamento**
+  - `scripts/test-booking-flow.mjs` troca dropdown por `CalendarPicker` (calendário visual)
+  - Flow JSON atualizado para `7.3` (recomendado pela Meta) e campos `min/max/include-days`
+
+- **✅ Confirmação automática pós‑Flow**
+  - `app/api/webhook/route.ts` envia mensagem de confirmação quando recebe `nfm_reply` do Flow
+  - Mensagem inclui serviço, data e horário quando disponíveis
+
 ## 25/12/2025 - Debug (Run/Trace para campanhas)
 
 - **🔎 Timeline estruturada por `trace_id` (sem caçar logs)**

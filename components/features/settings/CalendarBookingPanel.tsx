@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, Edit2, ChevronDown, ChevronUp, Clock, Check } from 'lucide-react';
+import { Calendar, Edit2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import {
   useCalendarBooking,
   type UseCalendarBookingProps,
