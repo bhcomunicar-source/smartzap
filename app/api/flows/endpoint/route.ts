@@ -73,12 +73,20 @@ export async function POST(request: NextRequest) {
     fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'endpoint-health',hypothesisId:'H4',location:'app/api/flows/endpoint/route.ts:62',message:'decrypted request',data:{action:flowRequest.action ?? null,screen:flowRequest.screen ?? null,hasData:Boolean(flowRequest.data)},timestamp:Date.now()})}).catch(()=>{});
     // #endregion agent log
 
-    // Health check - nao precisa criptografar response
+    // Health check - DEVE ser criptografado como todas as outras respostas
+    // Ref: https://developers.facebook.com/docs/whatsapp/flows/guides/implementingyourflowendpoint#health_check_request
     if (flowRequest.action === 'ping') {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/1294d6ce-76f2-430d-96ab-3ae4d7527327',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'endpoint-health',hypothesisId:'H4',location:'app/api/flows/endpoint/route.ts:66',message:'ping handled unencrypted response',data:{status:'active'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
-      return NextResponse.json({ data: { status: 'active' } })
+      console.log('[flow-endpoint] Ping received, responding with encrypted status')
+      const pingResponse = { data: { status: 'active' } }
+      const encryptedPingResponse = encryptResponse(
+        pingResponse,
+        decrypted.aesKeyBuffer,
+        decrypted.initialVectorBuffer
+      )
+      return new NextResponse(encryptedPingResponse, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      })
     }
 
     // Processa a acao do flow

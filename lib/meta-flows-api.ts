@@ -300,9 +300,11 @@ export async function metaGetEncryptionPublicKey(params: {
     throw new MetaGraphApiError(buildGraphErrorMessage(data, 'Falha ao buscar chave publica na Meta'), res.status, data)
   }
 
-  const metaKey = typeof data?.business_public_key === 'string' ? data.business_public_key : null
-  const signatureStatus = typeof data?.business_public_key_signature_status === 'string'
-    ? data.business_public_key_signature_status
+  // A Meta retorna { data: [{ business_public_key, business_public_key_signature_status }] }
+  const record = Array.isArray(data?.data) && data.data.length > 0 ? data.data[0] : data
+  const metaKey = typeof record?.business_public_key === 'string' ? record.business_public_key : null
+  const signatureStatus = typeof record?.business_public_key_signature_status === 'string'
+    ? record.business_public_key_signature_status
     : null
   const metaKeyHash = metaKey ? crypto.createHash('sha256').update(metaKey.trim().replace(/\r\n/g, '\n')).digest('hex').slice(0, 12) : null
   // #region agent log

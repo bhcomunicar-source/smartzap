@@ -2,6 +2,19 @@
 
 ## 15/01/2026 - MiniApps dinâmicos (agendamento)
 
+- **🔐 Health check (ping) agora retorna resposta CRIPTOGRAFADA**
+  - `app/api/flows/endpoint/route.ts` corrigido para criptografar resposta do ping
+  - Segundo documentação oficial da Meta, TODAS as respostas devem ser criptografadas
+  - Isso estava causando erro "Endpoint Not Available" na publicação
+
+- **📚 Documentação consolidada de WhatsApp Flows**
+  - Criado `docs/whatsapp-flows-complete-reference.md` com toda a documentação oficial
+  - Inclui checklist de implementação, códigos de erro, e exemplos de código
+
+- **🐛 Fix: Parser da chave pública da Meta**
+  - `lib/meta-flows-api.ts` agora lê corretamente `data.data[0]` em vez de `data` direto
+  - A Meta retorna `{ data: [{ business_public_key, ... }] }` e não `{ business_public_key }`
+
 - **✅ Publicação preserva Flow JSON dinâmico**
   - `app/api/flows/[id]/meta/publish/route.ts` agora mantém o `flow_json` salvo quando `data_api_version=3.0`
   - Evita regenerar a partir do `spec.form` e perder `data_exchange` no agendamento com Google Calendar
