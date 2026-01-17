@@ -4,6 +4,7 @@ export type FlowTemplateDTO = {
   description: string
   flowJson: Record<string, unknown>
   defaultMapping: any
+  isDynamic: boolean
 }
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {

@@ -13,6 +13,7 @@ export async function GET() {
       description: t.description,
       flowJson: t.flowJson,
       defaultMapping: t.defaultMapping,
+      isDynamic: t.isDynamic ?? false,
     })),
     {
       headers: {

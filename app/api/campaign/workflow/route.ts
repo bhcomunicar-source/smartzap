@@ -2589,7 +2589,7 @@ export async function POST(request: Request) {
       headers: request.headers,
       body: request.body,
       duplex: 'half',
-    })
+    } as RequestInit)
   }
 
   const response = await (workflowHandler as any).POST(request)

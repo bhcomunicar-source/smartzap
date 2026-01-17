@@ -1,4 +1,10 @@
-# Changelog (docs)
+# Changelog
+
+## 17/01/2026
+
+### Corrigido
+- **Detecção automática de ngrok no publish**: Ao publicar um flow dinâmico em ambiente de dev, o sistema agora detecta automaticamente se há um túnel ngrok ativo e usa essa URL como `endpoint_uri` para a Meta, em vez de usar a URL de produção salva no banco.
+- **Build errors corrigidos**: Corrigidos 6 erros de TypeScript que impediam o build (duplex typing, FlowTemplateDTO.isDynamic, onClick handler, Zod error.issues, screenInfo typing, handleBack arguments). (docs)
 
 ## 17/01/2026 - Validação Zod para serviços de agendamento
 

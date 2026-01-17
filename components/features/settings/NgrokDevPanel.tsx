@@ -110,7 +110,7 @@ export function NgrokDevPanel() {
         <Button type="button" variant="outline" onClick={stop} disabled={loading} className="h-8 border-white/10 bg-zinc-900/60">
           Parar
         </Button>
-        <Button type="button" variant="outline" onClick={refresh} disabled={loading} className="h-8 border-white/10 bg-zinc-900/60">
+        <Button type="button" variant="outline" onClick={() => refresh()} disabled={loading} className="h-8 border-white/10 bg-zinc-900/60">
           Atualizar
         </Button>
       </div>

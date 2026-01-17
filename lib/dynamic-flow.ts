@@ -23,8 +23,8 @@ export function validateBookingServices(
 ): { success: true; data: BookingServiceOption[] } | { success: false; error: string } {
   const result = BookingServicesArraySchema.safeParse(services)
   if (!result.success) {
-    const firstError = result.error.errors[0]
-    return { success: false, error: firstError?.message || 'Serviços inválidos' }
+    const firstIssue = result.error.issues[0]
+    return { success: false, error: firstIssue?.message || 'Serviços inválidos' }
   }
   return { success: true, data: result.data }
 }

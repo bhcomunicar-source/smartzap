@@ -283,7 +283,7 @@ function extractBookingRuntime(flowJson: any): BookingRuntimeKeys | null {
   const screens = Array.isArray(flowJson?.screens) ? flowJson.screens : []
   if (!screens.length) return null
 
-  const screenInfo = screens.map((screen: any) => {
+  const screenInfo: { screen: any; comps: any[]; payloadMap: Record<string, string> }[] = screens.map((screen: any) => {
     const comps = extractScreenComponents(screen)
     const payloadMap = extractPayloadKeyMap(screen)
     return { screen, comps, payloadMap }
@@ -293,17 +293,17 @@ function extractBookingRuntime(flowJson: any): BookingRuntimeKeys | null {
   const isDate = (c: any) => c?.type === 'CalendarPicker' || c?.type === 'DatePicker'
 
   const startInfo =
-    screenInfo.find(({ comps }) =>
+    screenInfo.find(({ comps }: { comps: any[] }) =>
       comps.some((c) => isChoice(c) && getDataBindingKey(c?.['data-source']) === 'services')
     ) ||
-    screenInfo.find(({ comps }) => comps.some((c) => isChoice(c) && !!getDataBindingKey(c?.['data-source'])))
+    screenInfo.find(({ comps }: { comps: any[] }) => comps.some((c) => isChoice(c) && !!getDataBindingKey(c?.['data-source'])))
 
   const timeInfo =
-    screenInfo.find(({ comps }) => comps.some((c) => isChoice(c) && getDataBindingKey(c?.['data-source']) === 'slots')) ||
-    screenInfo.find(({ comps }) => comps.some((c) => isChoice(c) && !!getDataBindingKey(c?.['data-source'])))
+    screenInfo.find(({ comps }: { comps: any[] }) => comps.some((c) => isChoice(c) && getDataBindingKey(c?.['data-source']) === 'slots')) ||
+    screenInfo.find(({ comps }: { comps: any[] }) => comps.some((c) => isChoice(c) && !!getDataBindingKey(c?.['data-source'])))
 
   const customerInfo =
-    screenInfo.find(({ comps }) => comps.some((c) => c?.type === 'TextInput' || c?.type === 'TextArea')) || null
+    screenInfo.find(({ comps }: { comps: any[] }) => comps.some((c) => c?.type === 'TextInput' || c?.type === 'TextArea')) || null
 
   if (!startInfo || !timeInfo || !customerInfo) return null
 
@@ -680,7 +680,7 @@ export async function handleFlowAction(
       break
 
     case 'BACK':
-      result = await handleBack(screen || '', data || {}, runtime)
+      result = await handleBack(screen || '', data || {})
       break
 
     default:
