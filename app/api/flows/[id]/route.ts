@@ -68,11 +68,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     let currentMetaFlowId: string | null = null
     if (patch.name !== undefined && !shouldResetMeta) {
       try {
-        let { data: metaRow, error: metaErr } = await supabase
+        let metaRow: any = null
+        let metaErr: any = null
+        ;({ data: metaRow, error: metaErr } = await supabase
           .from('flows')
           .select('name, meta_flow_id, meta_status, meta_preview_url, meta_validation_errors, meta_last_checked_at, meta_published_at')
           .eq('id', id)
-          .limit(1)
+          .limit(1))
         if (metaErr && isMissingDbColumn(metaErr)) {
           ;({ data: metaRow, error: metaErr } = await supabase.from('flows').select('name, meta_flow_id, meta_status').eq('id', id).limit(1))
         }

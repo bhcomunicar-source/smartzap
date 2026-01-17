@@ -1027,7 +1027,7 @@ export default function FlowBuilderEditorPage({
         </>
       )}
       {showAdvancedPanel &&
-        formPreviewJson &&
+        !!formPreviewJson &&
         typeof formPreviewJson === 'object' && (
         <>
           <div

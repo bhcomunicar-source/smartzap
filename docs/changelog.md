@@ -18,6 +18,11 @@
 - **🛠️ Ajuste de tipagem no editor unificado**
   - `app/(dashboard)/flows/builder/[id]/page.tsx` tipa corretamente o `prev` do `setEditorSpecOverride`, evitando erro TS no build
 
+## 15/01/2026 - Build fix no reset de meta
+
+- **🛠️ Ajuste de tipagem no PATCH de flows**
+  - `app/api/flows/[id]/route.ts` tipa `metaRow`/`metaErr` para evitar erro TS no build
+
 ## 17/01/2026 - Confirmação pós-finalização no editor unificado
 
 - **✅ Confirmação voltou a funcionar em telas finais**
