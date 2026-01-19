@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   X,
   UploadCloud,
@@ -9,7 +9,11 @@ import {
   CheckCircle2,
   Loader2,
   Settings2,
-  ChevronRight
+  ChevronRight,
+  Users,
+  UserCheck,
+  UserX,
+  Copy
 } from 'lucide-react';
 import {
   ContactStatus,
@@ -24,12 +28,21 @@ import { ContactFieldMappingSheet } from './ContactFieldMappingSheet';
 import { Container } from '@/components/ui/container';
 import { StatusBadge } from '@/components/ui/status-badge';
 
+// Estatísticas de pré-importação
+interface ImportPreviewStats {
+  totalRows: number;
+  validContacts: number;
+  invalidPhones: number;
+  duplicatesInCsv: number;      // Duplicados dentro do CSV
+  duplicatesInDatabase: number; // Já existem no banco
+}
+
 export interface ContactImportModalProps {
   isOpen: boolean;
   isImporting: boolean;
   customFields: CustomFieldDefinition[];
   onClose: () => void;
-  onImport: (contacts: ImportContact[]) => Promise<number>;
+  onImport: (contacts: ImportContact[]) => Promise<{ inserted: number; updated: number }>;
   onCustomFieldCreated: (field: CustomFieldDefinition) => void;
   onCustomFieldDeleted: (id: string) => void;
 }
@@ -57,10 +70,67 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({
   const [step, setStep] = useState<ImportStep>(1);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<CsvPreviewData>({ headers: [], rows: [] });
+  const [allRows, setAllRows] = useState<string[][]>([]); // Todas as linhas do CSV
+  const [existingPhones, setExistingPhones] = useState<Set<string>>(new Set()); // Telefones já no banco
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(initialColumnMapping);
-  const [importResult, setImportResult] = useState<ImportResult>({ total: 0, success: 0, errors: 0 });
+  const [importResult, setImportResult] = useState<ImportResult>({ total: 0, inserted: 0, updated: 0, errors: 0 });
   const [isMappingSheetOpen, setIsMappingSheetOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Buscar telefones existentes quando o modal abre
+  useEffect(() => {
+    if (isOpen) {
+      const fetchExistingPhones = async () => {
+        try {
+          const { contactService } = await import('@/services/contactService');
+          const contacts = await contactService.getAll();
+          const phones = new Set(contacts.map(c => c.phone).filter(Boolean));
+          setExistingPhones(phones);
+        } catch (err) {
+          console.error('Failed to fetch existing phones:', err);
+        }
+      };
+      fetchExistingPhones();
+    }
+  }, [isOpen]);
+
+  // Calcular estatísticas de pré-importação baseado no mapeamento atual
+  const previewStats = useMemo((): ImportPreviewStats => {
+    if (allRows.length === 0 || !columnMapping.phone) {
+      return { totalRows: 0, validContacts: 0, invalidPhones: 0, duplicatesInCsv: 0, duplicatesInDatabase: 0 };
+    }
+
+    const phoneIdx = csvPreview.headers.indexOf(columnMapping.phone);
+    if (phoneIdx === -1) {
+      return { totalRows: allRows.length, validContacts: 0, invalidPhones: allRows.length, duplicatesInCsv: 0, duplicatesInDatabase: 0 };
+    }
+
+    const seenPhones = new Set<string>();
+    let validContacts = 0;
+    let invalidPhones = 0;
+    let duplicatesInCsv = 0;
+    let duplicatesInDatabase = 0;
+
+    allRows.forEach(row => {
+      const phone = formatPhoneNumber(row[phoneIdx] || '');
+
+      if (phone.length <= 8) {
+        invalidPhones++;
+      } else if (seenPhones.has(phone)) {
+        // Duplicado dentro do próprio CSV
+        duplicatesInCsv++;
+      } else if (existingPhones.has(phone)) {
+        // Já existe no banco de dados
+        duplicatesInDatabase++;
+        seenPhones.add(phone); // Marcar para não contar como duplicado do CSV também
+      } else {
+        seenPhones.add(phone);
+        validContacts++;
+      }
+    });
+
+    return { totalRows: allRows.length, validContacts, invalidPhones, duplicatesInCsv, duplicatesInDatabase };
+  }, [allRows, columnMapping.phone, csvPreview.headers, existingPhones]);
 
   if (!isOpen) return null;
 
@@ -85,6 +155,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({
       }
 
       setCsvPreview({ headers, rows: rows.slice(0, 3) });
+      setAllRows(rows); // Armazenar todas as linhas para cálculo de estatísticas
 
       // Auto-map columns based on header names
       const lowerHeaders = headers.map(h => h.toLowerCase());
@@ -176,12 +247,13 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({
         };
       }).filter(c => c.phone.length > 8);
 
-      const importedCount = await onImport(contactsToImport);
+      const result = await onImport(contactsToImport);
 
       setImportResult({
         total: rows.length,
-        success: importedCount,
-        errors: rows.length - importedCount
+        inserted: result.inserted,
+        updated: result.updated,
+        errors: rows.length - contactsToImport.length // Linhas com telefone inválido
       });
       setStep(3);
     };
@@ -194,6 +266,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({
       setStep(1);
       setCsvFile(null);
       setCsvPreview({ headers: [], rows: [] });
+      setAllRows([]);
       setColumnMapping(initialColumnMapping);
     }, 300);
   };
@@ -231,6 +304,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({
               csvPreview={csvPreview}
               columnMapping={columnMapping}
               customFields={customFields}
+              previewStats={previewStats}
               onColumnMappingChange={setColumnMapping}
               onOpenMappingSheet={() => setIsMappingSheetOpen(true)}
               onReset={resetAndClose}
@@ -337,6 +411,7 @@ interface ImportStepMappingProps {
   csvPreview: CsvPreviewData;
   columnMapping: ColumnMapping;
   customFields: CustomFieldDefinition[];
+  previewStats: ImportPreviewStats;
   onColumnMappingChange: (mapping: ColumnMapping) => void;
   onOpenMappingSheet: () => void;
   onReset: () => void;
@@ -347,6 +422,7 @@ const ImportStepMapping: React.FC<ImportStepMappingProps> = ({
   csvPreview,
   columnMapping,
   customFields,
+  previewStats,
   onColumnMappingChange,
   onOpenMappingSheet,
   onReset
@@ -456,6 +532,57 @@ const ImportStepMapping: React.FC<ImportStepMappingProps> = ({
         </div>
       </div>
 
+      {/* Estatísticas de Pré-Importação */}
+      {columnMapping.phone && (
+        <div className="mt-4">
+          <h3 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-3">
+            Resumo da importação
+          </h3>
+          <div className="grid grid-cols-5 gap-2">
+            <div className="bg-zinc-900/50 rounded-lg p-2.5 border border-white/10 text-center">
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <Users size={12} className="text-gray-400" />
+                <span className="text-base font-bold text-white">{previewStats.totalRows}</span>
+              </div>
+              <p className="text-[9px] text-gray-500 uppercase">Total</p>
+            </div>
+            <div className="bg-emerald-500/10 rounded-lg p-2.5 border border-emerald-500/20 text-center">
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <UserCheck size={12} className="text-emerald-400" />
+                <span className="text-base font-bold text-emerald-400">{previewStats.validContacts}</span>
+              </div>
+              <p className="text-[9px] text-emerald-500/70 uppercase">Novos</p>
+            </div>
+            <div className="bg-blue-500/10 rounded-lg p-2.5 border border-blue-500/20 text-center">
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <Copy size={12} className="text-blue-400" />
+                <span className="text-base font-bold text-blue-400">{previewStats.duplicatesInDatabase}</span>
+              </div>
+              <p className="text-[9px] text-blue-500/70 uppercase">Já existem</p>
+            </div>
+            <div className="bg-amber-500/10 rounded-lg p-2.5 border border-amber-500/20 text-center">
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <Copy size={12} className="text-amber-400" />
+                <span className="text-base font-bold text-amber-400">{previewStats.duplicatesInCsv}</span>
+              </div>
+              <p className="text-[9px] text-amber-500/70 uppercase">Repetidos</p>
+            </div>
+            <div className="bg-red-500/10 rounded-lg p-2.5 border border-red-500/20 text-center">
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <UserX size={12} className="text-red-400" />
+                <span className="text-base font-bold text-red-400">{previewStats.invalidPhones}</span>
+              </div>
+              <p className="text-[9px] text-red-500/70 uppercase">Inválidos</p>
+            </div>
+          </div>
+          {(previewStats.duplicatesInDatabase > 0 || previewStats.duplicatesInCsv > 0 || previewStats.invalidPhones > 0) && (
+            <p className="text-xs text-gray-500 mt-2">
+              * Apenas {previewStats.validContacts} novos contatos serão adicionados
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Preview Table */}
       <div className="mt-4">
         <h3 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-3">
@@ -539,14 +666,18 @@ const ImportStepSuccess: React.FC<ImportStepSuccessProps> = ({ result }) => (
     <h3 className="text-2xl font-bold text-white mb-2">Importação Concluída!</h3>
     <p className="text-gray-400 mb-8">Seus contatos foram processados com sucesso.</p>
 
-    <div className="grid grid-cols-3 gap-4 max-w-md mx-auto mb-8">
+    <div className="grid grid-cols-4 gap-3 max-w-lg mx-auto mb-8">
       <Container variant="surface" padding="md">
         <p className="text-2xl font-bold text-white">{result.total}</p>
         <p className="text-xs text-gray-500">Linhas</p>
       </Container>
       <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20">
-        <p className="text-2xl font-bold text-emerald-400">{result.success}</p>
-        <p className="text-xs text-emerald-500/70">Sucessos</p>
+        <p className="text-2xl font-bold text-emerald-400">{result.inserted}</p>
+        <p className="text-xs text-emerald-500/70">Novos</p>
+      </div>
+      <div className="bg-blue-500/10 rounded-xl p-4 border border-blue-500/20">
+        <p className="text-2xl font-bold text-blue-400">{result.updated}</p>
+        <p className="text-xs text-blue-500/70">Atualizados</p>
       </div>
       <Container variant="surface" padding="md">
         <p className="text-2xl font-bold text-gray-400">{result.errors}</p>

@@ -261,9 +261,11 @@ export const contactService = {
   },
 
   /**
-   * Legacy import method (for backward compatibility)
+   * Import contacts with merge strategy
+   * - New contacts: inserted
+   * - Existing contacts (by phone): updated with merged tags
    */
-  import: async (contacts: Omit<Contact, 'id' | 'lastActive'>[]): Promise<number> => {
+  import: async (contacts: Omit<Contact, 'id' | 'lastActive'>[]): Promise<{ inserted: number; updated: number }> => {
     const validContacts = contacts
       .map(c => {
         const { normalized, validation } = processPhoneNumber(c.phone);
@@ -272,7 +274,7 @@ export const contactService = {
       })
       .filter((c): c is Omit<Contact, 'id' | 'lastActive'> => c !== null);
 
-    logger.info('Legacy import', {
+    logger.info('Import contacts', {
       total: contacts.length,
       valid: validContacts.length
     });
@@ -287,8 +289,8 @@ export const contactService = {
       throw new Error('Falha ao importar contatos');
     }
 
-    const { imported } = await response.json();
-    return imported;
+    const { inserted, updated } = await response.json();
+    return { inserted: inserted || 0, updated: updated || 0 };
   },
 
   delete: async (id: string): Promise<void> => {

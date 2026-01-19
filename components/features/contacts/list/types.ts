@@ -38,7 +38,8 @@ export interface ColumnMapping {
 // Import result summary
 export interface ImportResult {
   total: number;
-  success: number;
+  inserted: number;
+  updated: number;
   errors: number;
 }
 

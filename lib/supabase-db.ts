@@ -914,27 +914,84 @@ export const contactDb = {
         return ids.length
     },
 
-    import: async (contacts: Omit<Contact, 'id' | 'lastActive'>[]): Promise<number> => {
-        if (contacts.length === 0) return 0
+    import: async (contacts: Omit<Contact, 'id' | 'lastActive'>[]): Promise<{ inserted: number; updated: number }> => {
+        if (contacts.length === 0) return { inserted: 0, updated: 0 }
 
         const now = new Date().toISOString()
-        const rows = contacts.map(contact => ({
-            id: generateId(),
-            name: contact.name || '',
-            phone: contact.phone,
-            status: contact.status || ContactStatus.OPT_IN,
-            tags: contact.tags || [],
-            created_at: now,
-        }))
+        const phones = contacts.map(c => c.phone).filter(Boolean)
 
-        // Use upsert to handle duplicates (phone is unique)
-        const { error } = await supabase
+        // Buscar contatos existentes pelos telefones
+        const { data: existingContacts } = await supabase
             .from('contacts')
-            .upsert(rows, { onConflict: 'phone', ignoreDuplicates: true })
+            .select('id, phone, name, email, tags, custom_fields')
+            .in('phone', phones)
 
-        if (error) throw error
+        const existingByPhone = new Map(
+            (existingContacts || []).map(c => [c.phone, c])
+        )
 
-        return rows.length
+        const toInsert: any[] = []
+        const toUpdate: any[] = []
+
+        contacts.forEach(contact => {
+            const existing = existingByPhone.get(contact.phone)
+
+            if (existing) {
+                // Merge: atualiza dados e faz merge das tags
+                const existingTags = Array.isArray(existing.tags) ? existing.tags : []
+                const newTags = Array.isArray(contact.tags) ? contact.tags : []
+                const mergedTags = [...new Set([...existingTags, ...newTags])]
+
+                // Merge custom_fields
+                const existingCustomFields = existing.custom_fields && typeof existing.custom_fields === 'object'
+                    ? existing.custom_fields
+                    : {}
+                const newCustomFields = (contact as any).custom_fields && typeof (contact as any).custom_fields === 'object'
+                    ? (contact as any).custom_fields
+                    : {}
+                const mergedCustomFields = { ...existingCustomFields, ...newCustomFields }
+
+                toUpdate.push({
+                    id: existing.id,
+                    phone: contact.phone,
+                    name: contact.name || existing.name || '',
+                    email: (contact as any).email || existing.email || null,
+                    tags: mergedTags,
+                    custom_fields: mergedCustomFields,
+                    updated_at: now,
+                })
+            } else {
+                // Novo contato
+                toInsert.push({
+                    id: generateId(),
+                    name: contact.name || '',
+                    phone: contact.phone,
+                    email: (contact as any).email || null,
+                    status: contact.status || ContactStatus.OPT_IN,
+                    tags: contact.tags || [],
+                    custom_fields: (contact as any).custom_fields || {},
+                    created_at: now,
+                })
+            }
+        })
+
+        // Inserir novos
+        if (toInsert.length > 0) {
+            const { error: insertError } = await supabase
+                .from('contacts')
+                .insert(toInsert)
+            if (insertError) throw insertError
+        }
+
+        // Atualizar existentes
+        if (toUpdate.length > 0) {
+            const { error: updateError } = await supabase
+                .from('contacts')
+                .upsert(toUpdate, { onConflict: 'id' })
+            if (updateError) throw updateError
+        }
+
+        return { inserted: toInsert.length, updated: toUpdate.length }
     },
 
     getTags: async (): Promise<string[]> => {

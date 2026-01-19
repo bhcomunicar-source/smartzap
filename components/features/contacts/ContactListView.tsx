@@ -82,7 +82,7 @@ export interface ContactListViewProps {
   onBulkDeleteClick: () => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
-  onImport: (contacts: ImportContact[]) => Promise<number>;
+  onImport: (contacts: ImportContact[]) => Promise<{ inserted: number; updated: number }>;
   isImporting: boolean;
   isDeleting: boolean;
 }

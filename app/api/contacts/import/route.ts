@@ -30,16 +30,20 @@ export async function POST(request: Request) {
     const contactsWithDefaults = contacts.map(c => ({
       name: c.name || '',
       phone: c.phone,
+      email: c.email || null,
       status: ContactStatus.OPT_IN,
       tags: c.tags || [],
+      custom_fields: c.custom_fields || {},
     }))
 
-    const imported = await contactDb.import(contactsWithDefaults)
+    const result = await contactDb.import(contactsWithDefaults)
 
     return NextResponse.json({
-      imported,
+      inserted: result.inserted,
+      updated: result.updated,
       total: contacts.length,
-      duplicates: contacts.length - imported
+      // Manter compatibilidade com código legado
+      imported: result.inserted + result.updated,
     })
   } catch (error) {
     console.error('Failed to import contacts:', error)

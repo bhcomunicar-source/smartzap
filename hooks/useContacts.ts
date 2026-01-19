@@ -275,9 +275,12 @@ export const useContactsController = () => {
 
   const importMutation = useMutation({
     mutationFn: contactService.import,
-    onSuccess: (count) => {
+    onSuccess: (result) => {
       invalidateContacts(queryClient);
-      toast.success(`${count} contatos importados com sucesso!`);
+      const parts: string[] = [];
+      if (result.inserted > 0) parts.push(`${result.inserted} novos`);
+      if (result.updated > 0) parts.push(`${result.updated} atualizados`);
+      toast.success(`Importação concluída: ${parts.join(', ') || '0 contatos'}`);
     },
     onError: () => toast.error('Erro ao importar contatos')
   });
