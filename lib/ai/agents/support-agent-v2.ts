@@ -1,12 +1,12 @@
 /**
  * Support Agent V2 - Using AI SDK v6 patterns
  * Uses streamText + tools for structured output
- * Replaces generateObject with SDK-native patterns
+ * Includes File Search (RAG) integration for knowledge base queries
  */
 
 import { streamText, tool } from 'ai'
 import { z } from 'zod'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogleGenerativeAI, type GoogleGenerativeAIProviderMetadata } from '@ai-sdk/google'
 import { createClient } from '@/lib/supabase-server'
 import type { AIAgent, InboxConversation, InboxMessage } from '@/types'
 
@@ -83,8 +83,24 @@ const DEFAULT_TEMPERATURE = 0.7
 // System Prompt Builder
 // =============================================================================
 
-function buildSystemPrompt(agent: AIAgent, conversation: InboxConversation): string {
+function buildSystemPrompt(
+  agent: AIAgent,
+  conversation: InboxConversation,
+  hasKnowledgeBase: boolean
+): string {
   const contactName = conversation.contact?.name || 'Cliente'
+
+  const knowledgeBaseInstructions = hasKnowledgeBase
+    ? `
+KNOWLEDGE BASE (BASE DE CONHECIMENTO):
+Você tem acesso a uma base de conhecimento com documentos relevantes.
+- A ferramenta "file_search" será usada automaticamente para buscar informações
+- SEMPRE baseie suas respostas nas informações encontradas na base de conhecimento
+- Cite as fontes quando usar informações da base de conhecimento
+- Se a informação não estiver na base, informe ao cliente que vai verificar`
+    : `
+NOTA: Este agente não possui base de conhecimento configurada.
+Responda com base no contexto da conversa e no seu conhecimento geral.`
 
   return `${agent.system_prompt}
 
@@ -93,6 +109,7 @@ CONTEXTO DA CONVERSA:
 - Telefone: ${conversation.phone}
 - Prioridade: ${conversation.priority || 'normal'}
 - Total de mensagens: ${conversation.total_messages}
+${knowledgeBaseInstructions}
 
 INSTRUÇÕES IMPORTANTES:
 1. Responda sempre em português do Brasil
@@ -100,7 +117,7 @@ INSTRUÇÕES IMPORTANTES:
 3. Se não souber a resposta, admita e ofereça alternativas
 4. Detecte o sentimento do cliente (positivo, neutro, negativo, frustrado)
 5. Se o cliente estiver frustrado ou pedir para falar com humano, defina shouldHandoff como true
-6. Inclua as fontes utilizadas quando aplicável
+6. Inclua as fontes utilizadas quando aplicável (especialmente da base de conhecimento)
 
 CRITÉRIOS PARA TRANSFERÊNCIA (shouldHandoff = true):
 - Cliente explicitamente pede para falar com atendente/humano
@@ -191,6 +208,7 @@ function convertToAIMessages(
 /**
  * Process a conversation with the support agent using AI SDK v6 patterns
  * Uses streamText + tools for structured output
+ * Includes File Search (RAG) when agent has knowledge base configured
  */
 export async function processSupportAgentV2(
   config: SupportAgentConfig
@@ -218,30 +236,52 @@ export async function processSupportAgentV2(
   // Convert messages to AI SDK format (last 10 for context)
   const aiMessages = convertToAIMessages(messages.slice(-10))
 
-  // Create model
+  // Create model provider
   const google = createGoogleGenerativeAI({ apiKey })
   const modelId = agent.model || DEFAULT_MODEL_ID
   const model = google(modelId)
 
+  // Check if agent has a knowledge base configured
+  const hasKnowledgeBase = !!agent.file_search_store_id
+
   let response: SupportResponse | undefined
   let error: string | null = null
+  let groundingSources: Array<{ title: string; content: string }> = []
 
   try {
-    // Use streamText with tool for structured output
+    // Log knowledge base status
+    if (hasKnowledgeBase && agent.file_search_store_id) {
+      console.log(`[AI Agent V2] Enabling File Search with store: ${agent.file_search_store_id}`)
+    }
+
+    // Define the respond tool
+    const respondTool = tool({
+      description: 'Envia uma resposta estruturada ao usuário. SEMPRE use esta ferramenta após processar a mensagem.',
+      inputSchema: supportResponseSchema,
+      execute: async (params) => {
+        // Store the response for later use
+        response = params
+        return params
+      },
+    })
+
+    // Use streamText with tools for structured output
+    // File Search tool is added conditionally when agent has knowledge base
     const result = streamText({
       model,
-      system: buildSystemPrompt(agent, conversation),
+      system: buildSystemPrompt(agent, conversation, hasKnowledgeBase),
       messages: aiMessages,
       tools: {
-        respond: tool({
-          description: 'Envia uma resposta estruturada ao usuário. SEMPRE use esta ferramenta.',
-          inputSchema: supportResponseSchema,
-          execute: async (params) => {
-            // Store the response for later use
-            response = params
-            return params
-          },
-        }),
+        respond: respondTool,
+        // Conditionally add file_search tool if knowledge base is configured
+        ...(hasKnowledgeBase && agent.file_search_store_id
+          ? {
+              file_search: google.tools.fileSearch({
+                fileSearchStoreNames: [agent.file_search_store_id],
+                topK: 5, // Retrieve top 5 most relevant chunks
+              }),
+            }
+          : {}),
       },
       toolChoice: 'required',
       temperature: DEFAULT_TEMPERATURE,
@@ -254,9 +294,29 @@ export async function processSupportAgentV2(
       // Just consume the stream
     }
 
+    // Extract grounding metadata if available (from File Search)
+    const providerMetadata = (await result.providerMetadata) as GoogleGenerativeAIProviderMetadata | undefined
+    const groundingMetadata = providerMetadata?.groundingMetadata
+
+    if (groundingMetadata?.groundingChunks) {
+      groundingSources = groundingMetadata.groundingChunks
+        .filter((chunk) => chunk.retrievedContext)
+        .map((chunk) => ({
+          title: chunk.retrievedContext?.title || 'Documento',
+          content: chunk.retrievedContext?.text || '',
+        }))
+
+      console.log(`[AI Agent V2] Found ${groundingSources.length} grounding sources from knowledge base`)
+    }
+
     // If no response was captured, something went wrong
     if (!response) {
       throw new Error('No response generated from AI')
+    }
+
+    // Merge grounding sources with any sources from the response
+    if (groundingSources.length > 0) {
+      response.sources = [...(response.sources || []), ...groundingSources]
     }
   } catch (err) {
     error = err instanceof Error ? err.message : 'Unknown error'

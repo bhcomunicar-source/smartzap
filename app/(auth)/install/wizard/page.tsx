@@ -301,7 +301,7 @@ export default function InstallWizardPage() {
               A escolha é sua, {firstName}.
             </h2>
             <p className="mt-2 text-sm text-[var(--ds-text-secondary)] max-w-sm">
-              Pílula azul: voltar para onde estava. Pílula verde: descobrir até onde vai a toca do coelho.
+              Pílula vermelha: voltar para onde estava. Pílula verde: descobrir até onde vai a toca do coelho.
             </p>
 
             {/* Summary */}
@@ -337,10 +337,10 @@ export default function InstallWizardPage() {
             <div className="flex gap-3 mt-6 w-full">
               <Button
                 variant="outline"
-                className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
                 onClick={() => router.push('/install/start')}
               >
-                Pílula Azul
+                Pílula Vermelha
               </Button>
               <Button
                 variant="brand"

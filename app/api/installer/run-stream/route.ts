@@ -16,7 +16,7 @@ const RunSchema = z
   .object({
     vercel: z.object({
       token: z.string().min(1),
-      teamId: z.string().optional(),
+      teamId: z.string().nullish().transform(val => val ?? undefined), // aceita null do JSON
       projectId: z.string().min(1),
       targets: z.array(z.enum(['production', 'preview'])).min(1),
     }),
