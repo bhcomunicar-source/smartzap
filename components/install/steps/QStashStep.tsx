@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { StepCard } from '../StepCard';
 import { ServiceIcon } from '../ServiceIcon';
@@ -17,9 +17,7 @@ interface QStashStepProps {
  *
  * Campos:
  * - QStash Token: formato JWT ou prefixo qstash_
- * - Current Signing Key: prefixo sig_ (para verificar callbacks)
- *
- * Auto-submit quando ambos os campos estão válidos.
+ * - Current Signing Key: string longa (40+ chars) para verificar callbacks
  */
 export function QStashStep({ onComplete }: QStashStepProps) {
   const [token, setToken] = useState('');
@@ -28,9 +26,6 @@ export function QStashStep({ onComplete }: QStashStepProps) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Ref para evitar validação dupla
-  const hasTriggeredRef = useRef(false);
-
   // Valida formato do QStash token
   const isValidToken = (t: string): boolean => {
     const trimmed = t.trim();
@@ -38,28 +33,30 @@ export function QStashStep({ onComplete }: QStashStepProps) {
     return trimmed.split('.').length === 3 || trimmed.startsWith('qstash_');
   };
 
-  // Valida formato da signing key (apenas tamanho mínimo - formato varia)
+  // Valida formato da signing key
+  // A signing key do QStash é uma string longa (50+ chars), não tem prefixo específico
   const isValidSigningKey = (k: string): boolean => {
     const trimmed = k.trim();
-    // QStash signing keys têm ~50+ chars, exigimos mínimo de 20
-    return trimmed.length >= 20;
+    return trimmed.length >= 40; // Signing keys são longas
   };
 
   const canSubmit =
     token.trim().length >= 30 &&
     isValidToken(token) &&
-    signingKey.trim().length >= 20;
+    signingKey.trim().length >= 40 &&
+    isValidSigningKey(signingKey);
 
-  const handleValidate = async () => {
-    if (validating || success) return;
+  // Ref para evitar submits duplicados
+  const hasSubmittedRef = useRef(false);
 
+  const handleValidate = useCallback(async () => {
     if (!isValidToken(token)) {
       setError('Token QStash inválido (deve ser JWT ou começar com qstash_)');
       return;
     }
 
     if (!isValidSigningKey(signingKey)) {
-      setError('Signing Key inválida (deve começar com sig_)');
+      setError('Signing Key inválida (muito curta)');
       return;
     }
 
@@ -85,26 +82,28 @@ export function QStashStep({ onComplete }: QStashStepProps) {
 
       setSuccess(true);
     } catch (err) {
-      // Se API retornar 404, valida só o formato e prossegue
-      if (err instanceof Error && err.message.includes('404')) {
+      // Se API não existir ainda, valida só o formato
+      if (err instanceof TypeError && err.message.includes('fetch')) {
         setSuccess(true);
       } else {
         setError(err instanceof Error ? err.message : 'Erro ao validar');
-        hasTriggeredRef.current = false; // Permite tentar novamente
+        hasSubmittedRef.current = false; // Permitir retry
       }
     } finally {
       setValidating(false);
     }
-  };
+  }, [token, signingKey]);
 
   // Auto-submit quando ambos os campos estão válidos
   useEffect(() => {
-    if (canSubmit && !validating && !success && !error && !hasTriggeredRef.current) {
-      hasTriggeredRef.current = true;
-      const timer = setTimeout(handleValidate, 800);
+    if (canSubmit && !validating && !success && !error && !hasSubmittedRef.current) {
+      const timer = setTimeout(() => {
+        hasSubmittedRef.current = true;
+        handleValidate();
+      }, 800);
       return () => clearTimeout(timer);
     }
-  }, [canSubmit, validating, success, error]);
+  }, [canSubmit, validating, success, error, handleValidate]);
 
   const handleSuccessComplete = () => {
     onComplete({
@@ -153,7 +152,6 @@ export function QStashStep({ onComplete }: QStashStepProps) {
             onChange={(v) => {
               setToken(v);
               setError(null);
-              hasTriggeredRef.current = false; // Reset para permitir nova tentativa
             }}
             placeholder="eyJVc2VySUQi... ou qstash_..."
             minLength={30}
@@ -170,10 +168,9 @@ export function QStashStep({ onComplete }: QStashStepProps) {
             onChange={(v) => {
               setSigningKey(v);
               setError(null);
-              hasTriggeredRef.current = false; // Reset para permitir nova tentativa
             }}
-            placeholder="sig_xxxxxxxxxxxxxxxx"
-            minLength={30}
+            placeholder="Current Signing Key do console"
+            minLength={40}
             accentColor="orange"
             showCharCount={false}
           />
