@@ -17,12 +17,12 @@ function TelegramLayoutInner({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isReady) return;
 
-    const isLinkPage = pathname === '/link';
+    const isLinkPage = pathname === '/tg/link';
 
     if (!isLinked && !isLinkPage) {
-      router.replace('/link');
+      router.replace('/tg/link');
     } else if (isLinked && isLinkPage) {
-      router.replace('/');
+      router.replace('/tg');
     }
   }, [isReady, isLinked, pathname, router]);
 

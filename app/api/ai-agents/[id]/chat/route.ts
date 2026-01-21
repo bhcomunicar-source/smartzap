@@ -184,7 +184,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     } else if (body.sessionId && body.message) {
       // Session mode
       isSessionMode = true
-      sessionId = body.sessionId
+      sessionId = String(body.sessionId)
       userName = body.userName
 
       // Buscar ou criar sessão
@@ -284,11 +284,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       description: 'Envia uma resposta estruturada ao usuário. SEMPRE use esta ferramenta para responder.',
       inputSchema: responseSchema,
       execute: async (params) => {
+        const handoffParams = params as {
+          shouldHandoff?: boolean
+          handoffReason?: string
+          handoffSummary?: string
+        }
         structuredResponse = {
           ...params,
-          shouldHandoff: 'shouldHandoff' in params ? params.shouldHandoff : undefined,
-          handoffReason: 'handoffReason' in params ? params.handoffReason : undefined,
-          handoffSummary: 'handoffSummary' in params ? params.handoffSummary : undefined,
+          shouldHandoff: handoffParams.shouldHandoff,
+          handoffReason: handoffParams.handoffReason,
+          handoffSummary: handoffParams.handoffSummary,
           sources: ragSources.length > 0 ? ragSources : params.sources,
         }
         return { success: true, message: params.message }

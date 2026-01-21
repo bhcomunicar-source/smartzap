@@ -192,11 +192,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       description: 'Envia uma resposta estruturada ao usuário. SEMPRE use esta ferramenta para responder.',
       inputSchema: responseSchema,
       execute: async (params) => {
+        const handoffParams = params as {
+          shouldHandoff?: boolean
+          handoffReason?: string
+        }
         structuredResponse = {
           ...params,
-          // Garante que campos de handoff existam (mesmo que undefined) para compatibilidade
-          shouldHandoff: 'shouldHandoff' in params ? params.shouldHandoff : undefined,
-          handoffReason: 'handoffReason' in params ? params.handoffReason : undefined,
+          shouldHandoff: handoffParams.shouldHandoff,
+          handoffReason: handoffParams.handoffReason,
           sources: ragSources.length > 0 ? ragSources : params.sources,
         }
         return { success: true, message: params.message }

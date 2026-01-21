@@ -329,10 +329,10 @@ export async function processChatAgent(
       description: 'Envia uma resposta estruturada ao usuário. SEMPRE use esta ferramenta para responder.',
       inputSchema: responseSchema,
       execute: async (params) => {
+        const handoffParams = params as { shouldHandoff?: boolean }
         response = {
           ...params,
-          // Garante que campos de handoff existam (mesmo que undefined) para compatibilidade
-          shouldHandoff: 'shouldHandoff' in params ? params.shouldHandoff : false,
+          shouldHandoff: handoffParams.shouldHandoff ?? false,
           sources: sources || params.sources,
         }
         return { success: true, message: params.message }
