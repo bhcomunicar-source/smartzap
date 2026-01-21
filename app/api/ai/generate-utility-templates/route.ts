@@ -41,8 +41,12 @@ interface GeneratedTemplate {
   language: string
   status: string
   category: 'MARKETING' | 'UTILITY' // Definido pela strategy selecionada
-  // Valores de exemplo para variáveis (usado em BYPASS para preview)
+  // Variáveis genéricas (usado em MARKETING/UTILITY)
   variables?: Record<string, string>
+  // Variáveis comportadas para enviar à Meta na criação (usado em BYPASS)
+  sample_variables?: Record<string, string>
+  // Variáveis agressivas de marketing para envio real (usado em BYPASS)
+  marketing_variables?: Record<string, string>
   // AI Judge fields
   judgment?: {
     approved: boolean
@@ -169,7 +173,7 @@ function normalizeTemplate(
     }
   }
 
-  // Variables: valores de exemplo para preview (usado em BYPASS)
+  // Variables: valores de exemplo para preview (usado em MARKETING/UTILITY)
   let variables: GeneratedTemplate['variables'] = undefined
   if (rawTemplate.variables && typeof rawTemplate.variables === 'object') {
     const vars = rawTemplate.variables as Record<string, unknown>
@@ -179,9 +183,38 @@ function normalizeTemplate(
         variables[key] = value
       }
     }
-    // Só incluir se tiver pelo menos uma variável
     if (Object.keys(variables).length === 0) {
       variables = undefined
+    }
+  }
+
+  // Sample Variables: valores comportados para enviar à Meta (usado em BYPASS)
+  let sample_variables: GeneratedTemplate['sample_variables'] = undefined
+  if (rawTemplate.sample_variables && typeof rawTemplate.sample_variables === 'object') {
+    const vars = rawTemplate.sample_variables as Record<string, unknown>
+    sample_variables = {}
+    for (const [key, value] of Object.entries(vars)) {
+      if (typeof value === 'string') {
+        sample_variables[key] = value
+      }
+    }
+    if (Object.keys(sample_variables).length === 0) {
+      sample_variables = undefined
+    }
+  }
+
+  // Marketing Variables: valores agressivos para envio real (usado em BYPASS)
+  let marketing_variables: GeneratedTemplate['marketing_variables'] = undefined
+  if (rawTemplate.marketing_variables && typeof rawTemplate.marketing_variables === 'object') {
+    const vars = rawTemplate.marketing_variables as Record<string, unknown>
+    marketing_variables = {}
+    for (const [key, value] of Object.entries(vars)) {
+      if (typeof value === 'string') {
+        marketing_variables[key] = value
+      }
+    }
+    if (Object.keys(marketing_variables).length === 0) {
+      marketing_variables = undefined
     }
   }
 
@@ -195,7 +228,9 @@ function normalizeTemplate(
     language,
     status: 'DRAFT',
     category,
-    variables
+    variables,
+    sample_variables,
+    marketing_variables
   }
 }
 

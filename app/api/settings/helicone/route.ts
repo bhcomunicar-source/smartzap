@@ -41,7 +41,7 @@ export async function GET() {
         enabled,
         hasApiKey,
         // Não retorna a key completa por segurança, só os últimos 4 caracteres
-        apiKeyPreview: hasApiKey ? `sk-helicone-••••${apiKey.slice(-4)}` : null,
+        apiKeyPreview: hasApiKey && apiKey ? `sk-helicone-••••${apiKey.slice(-4)}` : null,
       },
     })
   } catch (error) {
@@ -89,16 +89,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Valida formato da API key se fornecida
-    if (apiKey && typeof apiKey === 'string' && apiKey.trim()) {
-      if (!apiKey.startsWith('sk-helicone-')) {
+    // Processa API key
+    if (typeof apiKey === 'string') {
+      if (apiKey.trim() === '') {
+        // String vazia = remover a chave
+        await settingsDb.set(SETTINGS_KEYS.apiKey, '')
+      } else if (!apiKey.startsWith('sk-helicone-')) {
         return NextResponse.json({
           ok: false,
           error: 'API key deve começar com "sk-helicone-"',
         }, { status: 400 })
+      } else {
+        // Salva a nova key
+        await settingsDb.set(SETTINGS_KEYS.apiKey, apiKey.trim())
       }
-      // Salva a key
-      await settingsDb.set(SETTINGS_KEYS.apiKey, apiKey.trim())
     }
 
     // Salva o status
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
       config: {
         enabled,
         hasApiKey,
-        apiKeyPreview: hasApiKey ? `sk-helicone-••••${updatedKey.slice(-4)}` : null,
+        apiKeyPreview: hasApiKey && updatedKey ? `sk-helicone-••••${updatedKey.slice(-4)}` : null,
       },
     })
   } catch (error) {

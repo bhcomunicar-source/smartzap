@@ -206,12 +206,20 @@ export default function NewTemplateProjectPage() {
     };
 
     // Substitui {{N}} por valores de exemplo
-    // Usa os valores do campo `variables` do template (gerado pela IA) quando disponível
+    // Para BYPASS: usa marketing_variables (conteúdo agressivo que o cliente recebe)
+    // Para outros: usa variables
+    // Fallback: DEFAULT_EXAMPLE_VALUES
     const fillVariables = (text: string, templateVariables?: Record<string, string>): string => {
         return text.replace(/\{\{(\d+)\}\}/g, (_, num) => {
-            // Prioridade: valores gerados pela IA > valores padrão
             return templateVariables?.[num] || DEFAULT_EXAMPLE_VALUES[num] || `[Variável ${num}]`;
         });
+    };
+
+    // Helper para obter as variáveis certas do template
+    // BYPASS: marketing_variables (o que o cliente recebe)
+    // Outros: variables
+    const getPreviewVariables = (template: GeneratedTemplate): Record<string, string> | undefined => {
+        return template.marketing_variables || template.variables;
     };
 
     // Conteúdo contextual baseado na estratégia
@@ -528,7 +536,7 @@ export default function NewTemplateProjectPage() {
                                     {t.header && (
                                         <div className="mt-1 font-semibold text-sm text-[var(--ds-text-primary)]">
                                             {t.header.text
-                                                ? (isHovered ? fillVariables(t.header.text, t.variables) : t.header.text)
+                                                ? (isHovered ? fillVariables(t.header.text, getPreviewVariables(t)) : t.header.text)
                                                 : `[Mídia: ${t.header.format}]`}
                                         </div>
                                     )}
@@ -536,7 +544,7 @@ export default function NewTemplateProjectPage() {
 
                                 {/* Body */}
                                 <div className={`text-sm whitespace-pre-wrap mb-4 transition-colors ${isHovered ? 'text-emerald-300' : 'text-[var(--ds-text-secondary)]'}`}>
-                                    {isHovered ? fillVariables(t.content, t.variables) : t.content}
+                                    {isHovered ? fillVariables(t.content, getPreviewVariables(t)) : t.content}
                                 </div>
 
                                 {/* Footer */}

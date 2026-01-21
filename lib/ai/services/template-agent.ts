@@ -98,8 +98,12 @@ export interface GeneratedTemplate {
         issues: Array<{ type: string; reason: string }>
     }
     wasFixed?: boolean
-    // Valores de exemplo para variáveis (usado em BYPASS para preview com conteúdo promocional)
+    // Variáveis genéricas (usado em MARKETING/UTILITY)
     variables?: Record<string, string>
+    // Variáveis comportadas para enviar à Meta na criação (usado em BYPASS)
+    sample_variables?: Record<string, string>
+    // Variáveis agressivas de marketing para envio real (usado em BYPASS)
+    marketing_variables?: Record<string, string>
 }
 
 export interface AgentGenerationResult {

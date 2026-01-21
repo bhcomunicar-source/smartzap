@@ -19,6 +19,7 @@ import {
   Drama,
   Target,
 } from 'lucide-react'
+import { HeliconePanel } from '@/components/features/settings/HeliconePanel'
 import { Page, PageActions, PageDescription, PageHeader, PageTitle } from '@/components/ui/page'
 import { AI_PROVIDERS, type AIProvider } from '@/lib/ai/providers'
 import {
@@ -1241,6 +1242,9 @@ export default function AICenterPage() {
             </div>
           </div>
         </section>
+
+        {/* Helicone Observability Section */}
+        <HeliconePanel />
 
         {/* Template Strategies Section - Collapsible */}
         <section className="relative overflow-hidden rounded-2xl border border-[var(--ds-border-default)] bg-gradient-to-br from-[var(--ds-bg-elevated)] to-[var(--ds-bg-surface)]">
