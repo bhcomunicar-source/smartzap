@@ -595,6 +595,12 @@ CREATE TABLE IF NOT EXISTS ai_agents (
   is_default BOOLEAN NOT NULL DEFAULT false,
   debounce_ms INTEGER NOT NULL DEFAULT 5000,
   handoff_enabled BOOLEAN NOT NULL DEFAULT true,
+  handoff_instructions TEXT DEFAULT 'Só transfira para humano quando o cliente PEDIR EXPLICITAMENTE para falar com uma pessoa, humano ou atendente.
+
+Se o cliente estiver frustrado ou insatisfeito:
+1. Primeiro peça desculpas e tente resolver
+2. Ofereça a OPÇÃO de falar com humano
+3. Só transfira se ele aceitar',
   booking_tool_enabled BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -602,6 +608,7 @@ CREATE TABLE IF NOT EXISTS ai_agents (
 
 COMMENT ON TABLE ai_agents IS 'AI agents configuration. RAG uses pgvector (ai_embeddings table) instead of Google File Search.';
 COMMENT ON COLUMN ai_agents.handoff_enabled IS 'Se habilitado, o agente pode sugerir transferência para atendente humano';
+COMMENT ON COLUMN ai_agents.handoff_instructions IS 'Instruções de quando o agente deve transferir para atendente humano. Concatenado ao system_prompt.';
 COMMENT ON COLUMN ai_agents.booking_tool_enabled IS 'When true, agent can send booking flow to clients for scheduling';
 
 -- inbox_conversations: contact_id FK adicionada no final como ALTER TABLE

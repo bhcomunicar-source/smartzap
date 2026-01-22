@@ -171,7 +171,7 @@ export interface SettingsViewProps {
   webhookSubscriptionLoading?: boolean;
   webhookSubscriptionMutating?: boolean;
   onRefreshWebhookSubscription?: () => void;
-  onSubscribeWebhookMessages?: () => Promise<void>;
+  onSubscribeWebhookMessages?: (callbackUrl?: string) => Promise<void>;
   onUnsubscribeWebhookMessages?: () => Promise<void>;
 
   // Phone numbers for webhook override

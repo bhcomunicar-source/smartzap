@@ -612,6 +612,7 @@ export interface AIAgent {
   rag_max_results: number | null;
   // Handoff config
   handoff_enabled: boolean;
+  handoff_instructions: string | null;
   // Booking tool config
   booking_tool_enabled: boolean;
   created_at: string;

@@ -14,6 +14,10 @@ interface PhoneNumbersListProps {
   onSetZapflowWebhook: (phoneId: string) => Promise<boolean | void>;
   onRemoveOverride: (phoneId: string) => Promise<boolean | void>;
   onSetCustomOverride: (phoneId: string, url: string) => Promise<boolean | void>;
+  // Ações WABA (#2)
+  onActivateWaba?: () => Promise<void>;
+  onDeactivateWaba?: () => Promise<void>;
+  isWabaBusy?: boolean;
 }
 
 export function PhoneNumbersList({
@@ -24,6 +28,9 @@ export function PhoneNumbersList({
   onSetZapflowWebhook,
   onRemoveOverride,
   onSetCustomOverride,
+  onActivateWaba,
+  onDeactivateWaba,
+  isWabaBusy,
 }: PhoneNumbersListProps) {
   if (!phoneNumbers || phoneNumbers.length === 0) {
     return null;
@@ -56,7 +63,7 @@ export function PhoneNumbersList({
                 neste app.
               </p>
               <p className="text-xs text-[var(--ds-text-muted)] mt-2">
-                Clique em "Ativar Prioridade #1" no número afetado para corrigir.
+                Expanda o funil e clique em "Ativar" no nível desejado para corrigir.
               </p>
             </div>
           </div>
@@ -92,6 +99,9 @@ export function PhoneNumbersList({
                 onSetZapflowWebhook={onSetZapflowWebhook}
                 onRemoveOverride={onRemoveOverride}
                 onSetCustomOverride={onSetCustomOverride}
+                onActivateWaba={onActivateWaba}
+                onDeactivateWaba={onDeactivateWaba}
+                isWabaBusy={isWabaBusy}
               />
             );
           })}

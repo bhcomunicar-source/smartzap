@@ -4,8 +4,6 @@ import React, { useState } from 'react';
 import {
   Phone,
   ChevronDown,
-  Zap,
-  Trash2,
   Loader2,
   Check,
   CheckCircle2,
@@ -27,6 +25,10 @@ interface PhoneNumberCardProps {
   onSetZapflowWebhook: (phoneId: string) => Promise<boolean | void>;
   onRemoveOverride: (phoneId: string) => Promise<boolean | void>;
   onSetCustomOverride: (phoneId: string, url: string) => Promise<boolean | void>;
+  // Ações WABA (#2)
+  onActivateWaba?: () => Promise<void>;
+  onDeactivateWaba?: () => Promise<void>;
+  isWabaBusy?: boolean;
 }
 
 export function PhoneNumberCard({
@@ -38,6 +40,9 @@ export function PhoneNumberCard({
   onSetZapflowWebhook,
   onRemoveOverride,
   onSetCustomOverride,
+  onActivateWaba,
+  onDeactivateWaba,
+  isWabaBusy,
 }: PhoneNumberCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isFunnelExpanded, setIsFunnelExpanded] = useState(false);
@@ -59,6 +64,15 @@ export function PhoneNumberCard({
   };
 
   const isBusy = isSavingOverride || isLocalSaving;
+
+  // Handlers para o funil
+  const handleActivateNumber = async () => {
+    await onSetZapflowWebhook(phone.id);
+  };
+
+  const handleDeactivateNumber = async () => {
+    await onRemoveOverride(phone.id);
+  };
 
   return (
     <div
@@ -86,7 +100,7 @@ export function PhoneNumberCard({
                 ) : webhookStatus.status === 'other' ? (
                   <>
                     <AlertCircle size={12} />
-                    <span>Outro sistema no nível #1</span>
+                    <span>Outro sistema no nível #{webhookStatus.level}</span>
                   </>
                 ) : webhookStatus.level === 2 ? (
                   <>
@@ -122,7 +136,7 @@ export function PhoneNumberCard({
                       ? 'bg-[var(--ds-status-info-bg)] text-[var(--ds-status-info-text)]'
                       : 'bg-[var(--ds-bg-surface)] text-[var(--ds-text-secondary)]')
               }
-              title="Clique para ver o funil completo"
+              title="Clique para ver e configurar o funil"
             >
               {webhookStatus.level > 0 && (
                 <span className="font-bold">#{webhookStatus.level}</span>
@@ -133,43 +147,21 @@ export function PhoneNumberCard({
                 className={'transition-transform ' + (isFunnelExpanded ? 'rotate-180' : '')}
               />
             </button>
-
-            {/* Actions */}
-            {!isEditing && (
-              <>
-                {webhookStatus.status !== 'smartzap' && (
-                  <button
-                    onClick={() => onSetZapflowWebhook(phone.id)}
-                    disabled={isBusy}
-                    className="h-10 px-3 text-xs font-medium bg-[var(--ds-status-success)] hover:opacity-90 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1"
-                  >
-                    {isBusy ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <Zap size={12} />
-                    )}
-                    Ativar Prioridade #1
-                  </button>
-                )}
-                {(webhookStatus.status === 'smartzap' || webhookStatus.status === 'other') && (
-                  <button
-                    onClick={() => onRemoveOverride(phone.id)}
-                    disabled={isBusy}
-                    className="h-10 w-10 flex items-center justify-center text-[var(--ds-text-muted)] hover:text-[var(--ds-status-error-text)] hover:bg-[var(--ds-status-error-bg)] rounded-lg transition-colors"
-                    title="Remover override (voltar para padrão)"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Funnel Visualization - Expandable */}
+      {/* Funnel Visualization - Expandable with inline actions */}
       {isFunnelExpanded && !isEditing && (
-        <WebhookFunnelVisualization funnelLevels={funnelLevels} />
+        <WebhookFunnelVisualization
+          funnelLevels={funnelLevels}
+          onActivateNumber={handleActivateNumber}
+          onDeactivateNumber={handleDeactivateNumber}
+          isNumberBusy={isBusy}
+          onActivateWaba={onActivateWaba}
+          onDeactivateWaba={onDeactivateWaba}
+          isWabaBusy={isWabaBusy}
+        />
       )}
 
       {/* Edit form */}

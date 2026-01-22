@@ -10,7 +10,6 @@ import { CalendarBookingPanel } from './CalendarBookingPanel';
 import { FlowEndpointPanel } from './FlowEndpointPanel';
 import { CredentialsForm } from './CredentialsForm';
 import { NgrokDevPanel } from './NgrokDevPanel';
-import { DevModePanel } from './DevModePanel';
 import { useDevMode } from '@/components/providers/DevModeProvider';
 import type { SettingsViewProps } from './types';
 
@@ -207,8 +206,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Flow Endpoint (MiniApp Dinamico) - Dev only */}
         {isDevMode && settings.isConnected && <FlowEndpointPanel devBaseUrl={devPublicBaseUrl} />}
 
-        {/* Test Contact Section - Dev only */}
-        {isDevMode && settings.isConnected && (
+        {/* Test Contact Section */}
+        {settings.isConnected && (
           <TestContactPanel
             testContact={testContact}
             saveTestContact={saveTestContact}
@@ -274,9 +273,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             availableDomains={availableDomains}
           />
         )}
-
-        {/* Developer Mode Toggle - sempre visível, último item */}
-        <DevModePanel />
       </div>
     </div>
   );

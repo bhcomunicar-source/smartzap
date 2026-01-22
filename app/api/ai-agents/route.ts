@@ -40,6 +40,11 @@ const createAgentSchema = z.object({
   // RAG: Search config
   rag_similarity_threshold: z.number().min(0).max(1).default(0.5),
   rag_max_results: z.number().int().min(1).max(20).default(5),
+  // Handoff config
+  handoff_enabled: z.boolean().default(true),
+  handoff_instructions: z.string().nullable().optional(),
+  // Booking tool config
+  booking_tool_enabled: z.boolean().default(false),
 })
 
 /**
@@ -125,6 +130,11 @@ export async function POST(request: NextRequest) {
         rerank_top_k: data.rerank_top_k,
         rag_similarity_threshold: data.rag_similarity_threshold,
         rag_max_results: data.rag_max_results,
+        // Handoff config
+        handoff_enabled: data.handoff_enabled,
+        handoff_instructions: data.handoff_instructions || null,
+        // Booking tool config
+        booking_tool_enabled: data.booking_tool_enabled,
       })
       .select()
       .single()

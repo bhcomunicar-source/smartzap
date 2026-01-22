@@ -208,7 +208,8 @@ async function cacheFirst(request, cacheName) {
 
   try {
     const response = await fetch(request)
-    if (response.ok) {
+    // Só cacheia requisições GET (Cache API não suporta HEAD/POST)
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(cacheName)
       cache.put(request, response.clone())
     }
@@ -222,11 +223,13 @@ async function cacheFirst(request, cacheName) {
 /**
  * Network-first: Tenta network, fallback para cache
  * Ideal para dados que precisam estar atualizados
+ * Nota: Cache API só suporta GET, então ignoramos HEAD/POST
  */
 async function networkFirst(request, cacheName) {
   try {
     const response = await fetch(request)
-    if (response.ok) {
+    // Só cacheia requisições GET (Cache API não suporta HEAD/POST)
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(cacheName)
       cache.put(request, response.clone())
     }
@@ -253,7 +256,8 @@ async function staleWhileRevalidate(request, cacheName) {
 
   const fetchPromise = fetch(request)
     .then((response) => {
-      if (response.ok) {
+      // Só cacheia requisições GET (Cache API não suporta HEAD/POST)
+      if (response.ok && request.method === 'GET') {
         cache.put(request, response.clone())
       }
       return response

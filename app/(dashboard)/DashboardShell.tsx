@@ -409,6 +409,7 @@ import { PrefetchLink } from '@/components/ui/PrefetchLink'
 import { AccountAlertBanner } from '@/components/ui/AccountAlertBanner'
 import { DashboardSidebar, type NavItem } from '@/components/layout/DashboardSidebar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { DevModeToggle } from '@/components/ui/dev-mode-toggle'
 import { useDevMode } from '@/components/providers/DevModeProvider'
 
 export function DashboardShell({
@@ -693,7 +694,10 @@ export function DashboardShell({
                                 </button>
                                 <span className="ml-2 text-sm font-medium text-[var(--ds-text-secondary)]">Inbox</span>
                             </div>
-                            <ThemeToggle compact />
+                            <div className="flex items-center gap-2">
+                                <ThemeToggle compact />
+                                <DevModeToggle />
+                            </div>
                         </header>
                         <PageContentShell>
                             {children}
@@ -754,6 +758,7 @@ export function DashboardShell({
 
                     <div className="flex items-center gap-3">
                         <ThemeToggle compact />
+                        <DevModeToggle />
                         <button className="relative group focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-2 rounded-md p-1" aria-label="Notificações (1 nova)">
                             <Bell size={20} className="text-[var(--ds-text-muted)] group-hover:text-[var(--ds-text-primary)] transition-colors cursor-pointer" aria-hidden="true" />
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-[var(--ds-bg-base)]" aria-label="1 notificação não lida"></span>

@@ -26,7 +26,7 @@ import { SetupStep } from '../components/features/settings/SetupWizardView';
 
 /**
  * Meta webhook subscription status.
- * Local interface as it's specific to the hook's query response.
+ * Includes WABA override info (#2 level) and hierarchy.
  */
 interface WebhookSubscriptionStatus {
   ok: boolean;
@@ -36,6 +36,19 @@ interface WebhookSubscriptionStatus {
   apps?: Array<{ id?: string; name?: string; subscribed_fields?: string[] }>;
   error?: string;
   details?: unknown;
+  // WABA override status (#2)
+  wabaOverride?: {
+    url: string | null;
+    isConfigured: boolean;
+    isSmartZap: boolean;
+  };
+  // Webhook hierarchy from phone number perspective
+  hierarchy?: {
+    phoneNumberOverride: string | null;
+    wabaOverride: string | null;
+    appWebhook: string | null;
+  } | null;
+  smartzapWebhookUrl?: string;
 }
 
 export const useSettingsController = () => {
@@ -340,16 +353,16 @@ export const useSettingsController = () => {
   })
 
   const subscribeWebhookMessagesMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (callbackUrl?: string) => {
       const response = await fetch('/api/meta/webhooks/subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: ['messages'] }),
+        body: JSON.stringify({ callbackUrl }), // Passa a URL do frontend (ex: ngrok)
       });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error((data as any)?.error || 'Erro ao inscrever messages');
+        throw new Error((data as any)?.error || 'Erro ao configurar webhook WABA');
       }
 
       return data;
@@ -358,17 +371,19 @@ export const useSettingsController = () => {
       await queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
       await queryClient.refetchQueries({ queryKey: ['metaWebhookSubscription'] });
 
-      const confirmed = !!data?.confirmed;
-      if (confirmed) {
-        toast.success('Inscrição do campo "messages" ativada!');
+      const isSmartZap = data?.wabaOverride?.isSmartZap;
+      if (isSmartZap) {
+        toast.success('SmartZap ativado para WABA!', {
+          description: 'Todos os números sem override #1 usarão este webhook.',
+        });
       } else {
-        toast.warning('Inscrição solicitada, mas a Meta ainda não confirmou.', {
-          description: 'Clique em “Atualizar status” em alguns segundos (ou tente de novo).',
+        toast.warning('Webhook WABA configurado.', {
+          description: 'Clique em "Atualizar status" para confirmar.',
         });
       }
     },
     onError: (err: any) => {
-      toast.error(err?.message || 'Erro ao ativar inscrição');
+      toast.error(err?.message || 'Erro ao configurar webhook WABA');
     },
   });
 
@@ -437,7 +452,7 @@ export const useSettingsController = () => {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error((data as any)?.error || 'Erro ao remover inscrição');
+        throw new Error((data as any)?.error || 'Erro ao remover webhook WABA');
       }
 
       return data;
@@ -446,17 +461,19 @@ export const useSettingsController = () => {
       await queryClient.invalidateQueries({ queryKey: ['metaWebhookSubscription'] });
       await queryClient.refetchQueries({ queryKey: ['metaWebhookSubscription'] });
 
-      const confirmed = data?.confirmed;
-      if (confirmed === true) {
-        toast.success('Inscrição removida.');
+      const isConfigured = data?.wabaOverride?.isConfigured;
+      if (!isConfigured) {
+        toast.success('Override WABA removido.', {
+          description: 'Webhooks voltarão a usar o fallback do App (#3).',
+        });
       } else {
         toast.message('Remoção solicitada.', {
-          description: 'Atualize o status para confirmar no WABA.',
+          description: 'Clique em "Atualizar status" para confirmar.',
         });
       }
     },
     onError: (err: any) => {
-      toast.error(err?.message || 'Erro ao remover inscrição');
+      toast.error(err?.message || 'Erro ao remover webhook WABA');
     },
   });
 

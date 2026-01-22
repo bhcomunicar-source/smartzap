@@ -32,9 +32,9 @@ export function WebhookUrlConfig({
   showTestUrl,
 }: WebhookUrlConfigProps) {
   return (
-    <div className="bg-[var(--ds-status-info-bg)] border border-[var(--ds-status-info)]/20 rounded-xl p-4 mb-6">
-      <h4 className="font-medium text-[var(--ds-status-info-text)] mb-3 flex items-center gap-2">
-        <Zap size={16} />
+    <div className="bg-[var(--ds-status-info-bg)] border border-[var(--ds-status-info)]/20 rounded-xl p-3 mb-6">
+      <h4 className="font-medium text-[var(--ds-status-info-text)] mb-2 flex items-center gap-2 text-sm">
+        <Zap size={14} />
         URL do Webhook SmartZap
       </h4>
 
@@ -62,37 +62,30 @@ export function WebhookUrlConfig({
         </div>
       )}
 
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <code className="flex-1 px-3 py-2 bg-[var(--ds-bg-elevated)] border border-[var(--ds-border-default)] rounded-lg font-mono text-sm text-[var(--ds-text-secondary)] break-all">
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* URL */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <code className="px-2 py-1 bg-[var(--ds-bg-elevated)] border border-[var(--ds-border-default)] rounded font-mono text-xs text-[var(--ds-text-secondary)] truncate max-w-[280px]" title={webhookUrl}>
             {webhookUrl}
           </code>
           <button
             onClick={() => onCopy(webhookUrl || '', 'url')}
-            className="h-10 px-3 bg-[var(--ds-bg-surface)] hover:bg-[var(--ds-bg-hover)] border border-[var(--ds-border-default)] rounded-lg transition-colors shrink-0"
+            className="p-1.5 hover:bg-[var(--ds-bg-hover)] rounded transition-colors shrink-0"
             title="Copiar URL"
           >
             {copiedField === 'url' ? (
-              <Check size={16} className="text-[var(--ds-status-success-text)]" />
+              <Check size={14} className="text-[var(--ds-status-success-text)]" />
             ) : (
-              <Copy size={16} className="text-[var(--ds-text-muted)]" />
+              <Copy size={14} className="text-[var(--ds-text-muted)]" />
             )}
           </button>
-          {showTestUrl ? (
-            <button
-              onClick={onTestUrl}
-              disabled={isTestingUrl}
-              className="h-10 px-3 bg-[var(--ds-status-info)]/20 hover:bg-[var(--ds-status-info)]/30 border border-[var(--ds-status-info)]/30 rounded-lg transition-colors text-xs text-[var(--ds-status-info-text)]"
-              title="Testar URL"
-            >
-              {isTestingUrl ? 'Testando...' : 'Testar URL'}
-            </button>
-          ) : null}
         </div>
-        <div className="flex gap-2 items-center">
+
+        {/* Token */}
+        <div className="flex items-center gap-1.5">
           <span className="text-xs text-[var(--ds-text-muted)]">Token:</span>
           <code className="px-2 py-1 bg-[var(--ds-bg-elevated)] rounded text-xs font-mono text-[var(--ds-text-secondary)]">
-            {webhookToken}
+            {webhookToken?.slice(0, 8)}...
           </code>
           <button
             onClick={() => onCopy(webhookToken || '', 'token')}
@@ -106,6 +99,18 @@ export function WebhookUrlConfig({
             )}
           </button>
         </div>
+
+        {/* Test Button */}
+        {showTestUrl && (
+          <button
+            onClick={onTestUrl}
+            disabled={isTestingUrl}
+            className="px-2.5 py-1 bg-[var(--ds-status-info)]/20 hover:bg-[var(--ds-status-info)]/30 border border-[var(--ds-status-info)]/30 rounded transition-colors text-xs text-[var(--ds-status-info-text)]"
+            title="Testar URL"
+          >
+            {isTestingUrl ? '...' : 'Testar'}
+          </button>
+        )}
       </div>
 
       {/* Webhook Status */}

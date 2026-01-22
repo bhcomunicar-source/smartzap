@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { getDashboardData } from './actions/dashboard'
-import { DashboardClientWrapper } from './DashboardClientWrapper'
 import { DashboardSkeleton } from '@/components/features/dashboard/DashboardSkeleton'
+import { DashboardClientLoader } from './DashboardClientLoader'
 
 // ISR: revalida a cada 30 segundos
 export const revalidate = 30
@@ -13,7 +13,7 @@ export const revalidate = 30
  */
 async function DashboardWithData() {
   const initialData = await getDashboardData()
-  return <DashboardClientWrapper initialData={initialData} />
+  return <DashboardClientLoader initialData={initialData} />
 }
 
 /**

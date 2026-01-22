@@ -9,7 +9,6 @@ import { SectionHeader } from '@/components/ui/section-header';
 
 import {
   WebhookUrlConfig,
-  WebhookSubscriptionStatus,
   PhoneNumbersList,
   WebhookLevelsExplanation,
   WebhookStats,
@@ -26,7 +25,7 @@ export interface WebhookConfigSectionProps {
   webhookSubscriptionLoading?: boolean;
   webhookSubscriptionMutating?: boolean;
   onRefreshWebhookSubscription?: () => void;
-  onSubscribeWebhookMessages?: () => Promise<void>;
+  onSubscribeWebhookMessages?: (callbackUrl?: string) => Promise<void>;
   onUnsubscribeWebhookMessages?: () => Promise<void>;
   phoneNumbers?: PhoneNumber[];
   phoneNumbersLoading?: boolean;
@@ -41,8 +40,6 @@ export function WebhookConfigSection({
   webhookToken,
   webhookStats,
   webhookPath,
-  webhookSubscription,
-  webhookSubscriptionLoading,
   webhookSubscriptionMutating,
   onRefreshWebhookSubscription,
   onSubscribeWebhookMessages,
@@ -141,6 +138,26 @@ export function WebhookConfigSection({
     }
   };
 
+  // Handler para ativar WABA - passa a URL computada (ex: ngrok)
+  const handleActivateWaba = async () => {
+    if (!computedWebhookUrl) {
+      toast.error('URL do webhook não configurada');
+      return;
+    }
+    await onSubscribeWebhookMessages?.(computedWebhookUrl);
+    // Refresh phone numbers para atualizar o funil com os novos dados
+    onRefreshPhoneNumbers?.();
+    onRefreshWebhookSubscription?.();
+  };
+
+  // Handler para desativar WABA
+  const handleDeactivateWaba = async () => {
+    await onUnsubscribeWebhookMessages?.();
+    // Refresh phone numbers para atualizar o funil
+    onRefreshPhoneNumbers?.();
+    onRefreshWebhookSubscription?.();
+  };
+
   return (
     <Container variant="glass" padding="lg">
       {/* Header */}
@@ -165,6 +182,7 @@ export function WebhookConfigSection({
 
       <p className="text-sm text-[var(--ds-text-secondary)] mt-4 mb-6">
         Webhooks são notificações que a Meta envia quando algo acontece (mensagem entregue, lida, etc).
+        Expanda o funil de cada número para configurar em qual nível o SmartZap captura os eventos.
       </p>
 
       {/* SmartZap Webhook URL Config */}
@@ -182,17 +200,7 @@ export function WebhookConfigSection({
         showTestUrl={process.env.NODE_ENV === 'development'}
       />
 
-      {/* Meta Subscription Status */}
-      <WebhookSubscriptionStatus
-        webhookSubscription={webhookSubscription}
-        webhookSubscriptionLoading={webhookSubscriptionLoading}
-        webhookSubscriptionMutating={webhookSubscriptionMutating}
-        onRefresh={onRefreshWebhookSubscription}
-        onSubscribe={onSubscribeWebhookMessages}
-        onUnsubscribe={onUnsubscribeWebhookMessages}
-      />
-
-      {/* Phone Numbers List */}
+      {/* Phone Numbers List with inline funnel actions */}
       {phoneNumbers && phoneNumbers.length > 0 && (
         <PhoneNumbersList
           phoneNumbers={phoneNumbers}
@@ -202,6 +210,9 @@ export function WebhookConfigSection({
           onSetZapflowWebhook={handleSetZapflowWebhook}
           onRemoveOverride={handleRemoveOverride}
           onSetCustomOverride={handleSetCustomOverride}
+          onActivateWaba={handleActivateWaba}
+          onDeactivateWaba={handleDeactivateWaba}
+          isWabaBusy={webhookSubscriptionMutating}
         />
       )}
 

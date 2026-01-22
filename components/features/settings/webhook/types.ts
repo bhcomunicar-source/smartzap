@@ -13,12 +13,28 @@ export interface DomainOption {
   recommended: boolean;
 }
 
+export interface WabaOverrideStatus {
+  url: string | null;
+  isConfigured: boolean;
+  isSmartZap: boolean;
+}
+
+export interface WebhookHierarchy {
+  phoneNumberOverride: string | null;
+  wabaOverride: string | null;
+  appWebhook: string | null;
+}
+
 export interface WebhookSubscription {
   ok: boolean;
   wabaId?: string;
   messagesSubscribed?: boolean;
   subscribedFields?: string[];
   error?: string;
+  // Novo: informações do override WABA (#2)
+  wabaOverride?: WabaOverrideStatus;
+  hierarchy?: WebhookHierarchy | null;
+  smartzapWebhookUrl?: string;
 }
 
 export interface WebhookStatus {
@@ -49,7 +65,7 @@ export interface WebhookConfigSectionProps {
   webhookSubscriptionLoading?: boolean;
   webhookSubscriptionMutating?: boolean;
   onRefreshWebhookSubscription?: () => void;
-  onSubscribeWebhookMessages?: () => Promise<void>;
+  onSubscribeWebhookMessages?: (callbackUrl?: string) => Promise<void>;
   onUnsubscribeWebhookMessages?: () => Promise<void>;
   phoneNumbers?: PhoneNumber[];
   phoneNumbersLoading?: boolean;

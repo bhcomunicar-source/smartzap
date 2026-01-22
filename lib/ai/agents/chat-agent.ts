@@ -147,6 +147,8 @@ const baseResponseSchema = z.object({
 })
 
 // Campos de handoff (adicionados quando habilitado)
+// NOTA: A lógica de QUANDO fazer handoff deve estar no system_prompt do agente,
+// não aqui. Este schema apenas define a estrutura da resposta.
 const handoffFields = {
   shouldHandoff: z
     .boolean()
@@ -363,14 +365,22 @@ export async function processChatAgent(
     // TOOL-BASED RAG: LLM decides when to search
     // =======================================================================
 
-    // Use agent's system prompt + memory context (if available)
-    const systemPrompt = memoryContext.systemPromptAddition
-      ? `${agent.system_prompt}\n\n${memoryContext.systemPromptAddition}`
-      : agent.system_prompt
-
     // Define respond tool (required for structured output)
     // Schema é dinâmico baseado em handoff_enabled
     const handoffEnabled = agent.handoff_enabled ?? true // default true para compatibilidade
+
+    // Build system prompt: base + handoff instructions (if enabled) + memory context
+    let systemPrompt = agent.system_prompt
+
+    // Adiciona instruções de handoff se habilitado e configurado
+    if (handoffEnabled && agent.handoff_instructions) {
+      systemPrompt += `\n\n## Transferência para Humano\n${agent.handoff_instructions}`
+    }
+
+    // Adiciona contexto de memória (Mem0) se disponível
+    if (memoryContext.systemPromptAddition) {
+      systemPrompt += `\n\n${memoryContext.systemPromptAddition}`
+    }
     const responseSchema = getResponseSchema(handoffEnabled)
 
     console.log(`[chat-agent] Handoff enabled: ${handoffEnabled}`)

@@ -232,6 +232,7 @@ Após modificar o schema_init.sql:
 |------|-----------|
 | 2026-01-20 | Consolidação inicial (fab8738) |
 | 2026-01-21 | Consolidação completa: attendant_tokens, push_subscriptions, strategy_prompts (sem Telegram) |
+| 2026-01-22 | Adicionado handoff_instructions em ai_agents |
 
 ### Migrations Consolidadas em 2026-01-21
 
@@ -243,6 +244,10 @@ Após modificar o schema_init.sql:
 - `20260122000003_add_template_variables_columns.sql` - Colunas sample/marketing_variables
 - `20260122000004_add_source_to_template_projects.sql` - Coluna source em template_projects
 - `20260122000005_add_missing_template_item_columns.sql` - Colunas header/footer/buttons/variables
+
+### Migrations Consolidadas em 2026-01-22
+
+- `20260122000001_add_handoff_instructions.sql` - Coluna handoff_instructions em ai_agents (instruções de handoff)
 
 **Nota:** Telegram Mini App (`20260122000000_telegram_miniapp.sql`) NÃO foi consolidado - feature removida.
 

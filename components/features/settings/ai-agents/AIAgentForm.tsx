@@ -41,20 +41,20 @@ import { DEFAULT_MODEL_ID, AI_PROVIDERS, type AIProvider } from '@/lib/ai/model'
 import { EMBEDDING_PROVIDERS, DEFAULT_EMBEDDING_CONFIG } from '@/lib/ai/embeddings'
 import { RERANK_PROVIDERS } from '@/lib/ai/reranking'
 
-// Default system prompt template
-const DEFAULT_SYSTEM_PROMPT = `Você é um assistente virtual da empresa [NOME_EMPRESA].
+// Default handoff instructions
+const DEFAULT_HANDOFF_INSTRUCTIONS = `Só transfira para humano quando o cliente PEDIR EXPLICITAMENTE para falar com uma pessoa, humano ou atendente.
 
-Sua função é:
-- Responder dúvidas dos clientes de forma educada e profissional
-- Ajudar com informações sobre produtos e serviços
-- Agendar atendimentos quando necessário
-- Transferir para um atendente humano quando o assunto exigir
+Se o cliente estiver frustrado ou insatisfeito:
+1. Primeiro peça desculpas e tente resolver
+2. Ofereça a OPÇÃO de falar com humano
+3. Só transfira se ele aceitar`
 
-Regras:
-- Sempre responda em português do Brasil
-- Seja cordial e empático
-- Se não souber a resposta, admita e ofereça alternativas
-- Nunca invente informações sobre preços ou disponibilidade`
+// Default system prompt template (minimalista - baseado em padrões do Google)
+const DEFAULT_SYSTEM_PROMPT = `Você é a [nome], assistente virtual da [empresa].
+
+Você ajuda clientes com dúvidas sobre produtos e pedidos.
+
+Seja amigável e objetivo. Se não souber algo, diga que vai verificar.`
 
 export interface AIAgentFormProps {
   open: boolean
@@ -83,6 +83,7 @@ export function AIAgentForm({
   const [isActive, setIsActive] = useState(true)
   const [isDefault, setIsDefault] = useState(false)
   const [handoffEnabled, setHandoffEnabled] = useState(true)
+  const [handoffInstructions, setHandoffInstructions] = useState('')
   const [bookingToolEnabled, setBookingToolEnabled] = useState(false)
 
   // RAG: Embedding config
@@ -216,6 +217,7 @@ export function AIAgentForm({
       setIsActive(agent.is_active)
       setIsDefault(agent.is_default)
       setHandoffEnabled(agent.handoff_enabled ?? true)
+      setHandoffInstructions(agent.handoff_instructions || DEFAULT_HANDOFF_INSTRUCTIONS)
       setBookingToolEnabled(agent.booking_tool_enabled ?? false)
       // RAG config
       setEmbeddingProvider(agent.embedding_provider || DEFAULT_EMBEDDING_CONFIG.provider)
@@ -239,6 +241,7 @@ export function AIAgentForm({
       setIsActive(true)
       setIsDefault(false)
       setHandoffEnabled(true)
+      setHandoffInstructions(DEFAULT_HANDOFF_INSTRUCTIONS)
       setBookingToolEnabled(false)
       // RAG config defaults
       setEmbeddingProvider(DEFAULT_EMBEDDING_CONFIG.provider)
@@ -267,6 +270,7 @@ export function AIAgentForm({
       is_active: isActive,
       is_default: isDefault,
       handoff_enabled: handoffEnabled,
+      handoff_instructions: handoffEnabled ? handoffInstructions : null,
       booking_tool_enabled: bookingToolEnabled,
       // RAG config
       embedding_provider: embeddingProvider,
@@ -434,7 +438,7 @@ export function AIAgentForm({
                 required
               />
               <p className="text-xs text-[var(--ds-text-muted)]">
-                Instruções que definem a personalidade e comportamento do agente
+                Dica: Defina quem é o agente, o que ele faz e como deve se comportar. Quanto mais claro, melhor.
               </p>
             </div>
 
@@ -796,22 +800,40 @@ export function AIAgentForm({
                 />
               </div>
 
-              <div className="flex items-center justify-between border-t border-[var(--ds-border-default)] pt-3">
-                <div>
-                  <Label htmlFor="handoffEnabled" className="text-sm">
-                    Transferência para humano
-                  </Label>
-                  <p className="text-xs text-[var(--ds-text-muted)]">
-                    {handoffEnabled
-                      ? 'Agente pode sugerir transferir para atendente'
-                      : 'Agente nunca sugere transferência'}
-                  </p>
+              <div className="space-y-3 border-t border-[var(--ds-border-default)] pt-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="handoffEnabled" className="text-sm">
+                      Transferência para humano
+                    </Label>
+                    <p className="text-xs text-[var(--ds-text-muted)]">
+                      {handoffEnabled
+                        ? 'Agente pode sugerir transferir para atendente'
+                        : 'Agente nunca sugere transferência'}
+                    </p>
+                  </div>
+                  <Switch
+                    id="handoffEnabled"
+                    checked={handoffEnabled}
+                    onCheckedChange={setHandoffEnabled}
+                  />
                 </div>
-                <Switch
-                  id="handoffEnabled"
-                  checked={handoffEnabled}
-                  onCheckedChange={setHandoffEnabled}
-                />
+
+                {/* Handoff Instructions - só aparece quando habilitado */}
+                {handoffEnabled && (
+                  <div className="space-y-2">
+                    <Label htmlFor="handoffInstructions" className="text-xs text-[var(--ds-text-muted)]">
+                      Regras de transferência
+                    </Label>
+                    <Textarea
+                      id="handoffInstructions"
+                      value={handoffInstructions}
+                      onChange={(e) => setHandoffInstructions(e.target.value)}
+                      placeholder="Instruções de quando transferir..."
+                      className="min-h-[100px] resize-none text-xs"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between border-t border-[var(--ds-border-default)] pt-3">

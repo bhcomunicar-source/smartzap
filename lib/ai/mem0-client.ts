@@ -33,6 +33,18 @@ export interface MemoryContext {
   memoryCount: number
 }
 
+export interface UserMemory {
+  id: string
+  memory: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface UserMemoriesResult {
+  memories: UserMemory[]
+  count: number
+}
+
 interface Mem0Credentials {
   apiKey: string | null
   enabled: boolean
@@ -51,6 +63,7 @@ interface Mem0Memory {
 // =============================================================================
 
 const MEM0_TIMEOUT_MS = 3000 // 3 segundos de timeout
+const MEM0_API_BASE = 'https://api.mem0.ai/v1'
 const APP_ID = 'smartzap'
 
 // Cache em memória (evita bater no banco em toda requisição)
@@ -262,6 +275,142 @@ export async function saveInteractionMemory(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.warn(`[mem0] Failed to save memory: ${errorMessage}`)
     return false
+  }
+}
+
+/**
+ * Busca todas as memórias de um usuário.
+ * Útil para mostrar contexto a atendentes humanos.
+ *
+ * Usa a API REST do Mem0 diretamente (o SDK Vercel AI não expõe essa função).
+ */
+export async function getAllUserMemories(userId: string): Promise<UserMemoriesResult> {
+  const creds = await getMem0Credentials()
+
+  if (!creds.enabled || !creds.apiKey) {
+    return { memories: [], count: 0 }
+  }
+
+  try {
+    // Usa POST /v2/memories/ com filtros (app_id é obrigatório pois salvamos com ele)
+    const url = `${MEM0_API_BASE.replace('/v1', '/v2')}/memories/`
+    const body = {
+      filters: {
+        AND: [
+          { user_id: userId },
+          { app_id: APP_ID },
+        ],
+      },
+    }
+
+    const response = await withTimeout(
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${creds.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }),
+      MEM0_TIMEOUT_MS * 2
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[mem0] getAllUserMemories error: ${response.status} - ${errorText}`)
+      throw new Error(`Mem0 API error: ${response.status}`)
+    }
+
+    // v2 retorna array diretamente
+    const rawMemories = await response.json()
+    const memories = (Array.isArray(rawMemories) ? rawMemories : []).map((m: Record<string, unknown>) => ({
+      id: m.id as string,
+      memory: m.memory as string,
+      created_at: m.created_at as string | undefined,
+      updated_at: m.updated_at as string | undefined,
+    }))
+
+    console.log(`[mem0] Retrieved ${memories.length} memories for ${userId}`)
+    return { memories, count: memories.length }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.warn(`[mem0] Failed to get all memories: ${errorMessage}`)
+    return { memories: [], count: 0 }
+  }
+}
+
+/**
+ * Deleta uma memória específica por ID.
+ */
+export async function deleteMemoryById(memoryId: string): Promise<boolean> {
+  const creds = await getMem0Credentials()
+
+  if (!creds.enabled || !creds.apiKey) {
+    return false
+  }
+
+  try {
+    const response = await withTimeout(
+      fetch(`${MEM0_API_BASE}/memories/${memoryId}/`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Token ${creds.apiKey}`,
+        },
+      }),
+      MEM0_TIMEOUT_MS
+    )
+
+    if (!response.ok) {
+      throw new Error(`Mem0 API error: ${response.status}`)
+    }
+
+    console.log(`[mem0] Deleted memory ${memoryId}`)
+    return true
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.warn(`[mem0] Failed to delete memory: ${errorMessage}`)
+    return false
+  }
+}
+
+/**
+ * Deleta todas as memórias de um usuário.
+ * Usado para compliance com LGPD (direito ao esquecimento).
+ *
+ * Usa a API REST do Mem0 diretamente.
+ */
+export async function deleteUserMemories(userId: string): Promise<{ success: boolean; deletedCount: number }> {
+  const creds = await getMem0Credentials()
+
+  if (!creds.enabled || !creds.apiKey) {
+    return { success: false, deletedCount: 0 }
+  }
+
+  try {
+    const response = await withTimeout(
+      fetch(`${MEM0_API_BASE}/memories/?user_id=${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Token ${creds.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }),
+      MEM0_TIMEOUT_MS * 2
+    )
+
+    if (!response.ok) {
+      throw new Error(`Mem0 API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const deletedCount = data.deleted_count || 0
+
+    console.log(`[mem0] Deleted ${deletedCount} memories for ${userId}`)
+    return { success: true, deletedCount }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.warn(`[mem0] Failed to delete memories: ${errorMessage}`)
+    return { success: false, deletedCount: 0 }
   }
 }
 

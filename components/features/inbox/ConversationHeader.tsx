@@ -26,6 +26,7 @@ import {
   Clock,
   Trash2,
   Settings2,
+  Brain,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -64,6 +65,7 @@ import type {
   ConversationMode,
   ConversationPriority,
 } from '@/types'
+import { ContactMemoriesSheet } from './ContactMemoriesSheet'
 
 export interface ConversationHeaderProps {
   conversation: InboxConversation
@@ -137,6 +139,9 @@ export function ConversationHeader({
 
   // Delete confirmation dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Memories sheet state
+  const [showMemoriesSheet, setShowMemoriesSheet] = useState(false)
 
   // Check if AI agents are globally enabled
   const { enabled: aiGlobalEnabled } = useAIAgentsGlobalToggle()
@@ -225,6 +230,21 @@ export function ConversationHeader({
 
       {/* Actions - compact */}
       <div className="flex items-center gap-1">
+        {/* Memories quick access */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setShowMemoriesSheet(true)}
+              className="h-7 w-7 flex items-center justify-center text-violet-400 hover:text-violet-300 rounded-lg hover:bg-violet-500/10 transition-colors"
+            >
+              <Brain className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            Ver memórias do contato
+          </TooltipContent>
+        </Tooltip>
+
         {/* Mode toggle - colored pill */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -457,6 +477,14 @@ export function ConversationHeader({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Contact memories sheet */}
+        <ContactMemoriesSheet
+          open={showMemoriesSheet}
+          onOpenChange={setShowMemoriesSheet}
+          phone={phone}
+          contactName={displayName}
+        />
       </div>
     </div>
   )
