@@ -97,6 +97,8 @@ export default function InstallWizardPage() {
 
   // Hydration: check if all data is present
   useEffect(() => {
+    console.log('[WizardPage] useEffect de hidratação executando...');
+
     const vercelToken = localStorage.getItem(STORAGE_KEYS.VERCEL_TOKEN);
     const vercelProject = localStorage.getItem(STORAGE_KEYS.VERCEL_PROJECT);
     const supabasePat = localStorage.getItem(STORAGE_KEYS.SUPABASE_PAT);
@@ -109,6 +111,24 @@ export default function InstallWizardPage() {
     const name = localStorage.getItem(STORAGE_KEYS.USER_NAME);
     const email = localStorage.getItem(STORAGE_KEYS.USER_EMAIL);
     const passwordHash = localStorage.getItem(STORAGE_KEYS.USER_PASS_HASH);
+
+    // Debug: mostrar quais dados estão faltando
+    const missingData = {
+      vercelToken: !vercelToken,
+      vercelProject: !vercelProject,
+      supabasePat: !supabasePat,
+      supabaseDbPass: !supabaseDbPass,
+      qstashToken: !qstashToken,
+      redisUrl: !redisUrl,
+      redisToken: !redisToken,
+      name: !name,
+      email: !email,
+      passwordHash: !passwordHash,
+    };
+    const hasMissing = Object.values(missingData).some(v => v);
+    if (hasMissing) {
+      console.log('[WizardPage] Dados faltando:', missingData);
+    }
 
     // Missing data → go back to start
     // Note: supabaseDbPass is critical - we need it to connect as postgres user
@@ -124,9 +144,12 @@ export default function InstallWizardPage() {
       !email ||
       !passwordHash
     ) {
+      console.log('[WizardPage] Redirecionando de volta para /install/start (dados faltando)');
       router.replace('/install/start');
       return;
     }
+
+    console.log('[WizardPage] Todos os dados presentes, continuando...');
 
     // Supabase URL: se não tiver, gerar baseado no ref
     let resolvedSupabaseUrl = supabaseUrl || '';

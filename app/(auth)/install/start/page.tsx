@@ -300,8 +300,11 @@ export default function InstallStartPage() {
 
   const handleRedisComplete = useCallback(
     (data: { restUrl: string; restToken: string }) => {
+      console.log('[InstallStart] handleRedisComplete chamado:', data);
+
       localStorage.setItem(STORAGE_KEYS.REDIS_REST_URL, data.restUrl);
       localStorage.setItem(STORAGE_KEYS.REDIS_REST_TOKEN, data.restToken);
+      console.log('[InstallStart] Dados salvos no localStorage');
 
       setState((prev) => ({
         ...prev,
@@ -310,6 +313,7 @@ export default function InstallStartPage() {
       }));
 
       // All done! Redirect to wizard
+      console.log('[InstallStart] Redirecionando para /install/wizard...');
       router.push('/install/wizard');
     },
     [router]

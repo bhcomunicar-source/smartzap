@@ -89,6 +89,7 @@ export function RedisStep({ onComplete }: RedisStepProps) {
   };
 
   const handleSuccessComplete = () => {
+    console.log('[RedisStep] handleSuccessComplete chamado, redirecionando para wizard...');
     onComplete({
       restUrl: restUrl.trim(),
       restToken: restToken.trim(),
