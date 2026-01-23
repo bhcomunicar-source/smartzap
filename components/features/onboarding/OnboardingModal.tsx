@@ -27,8 +27,8 @@ import { Button } from '@/components/ui/button';
 
 // Renderiza step em modo tutorial (read-only, só visualização)
 function renderTutorialStep(step: OnboardingStep, onClose?: () => void) {
-  // Função que garante fechamento
-  const handleClose = () => {
+  // Função que garante fechamento (async para compatibilidade com onComplete)
+  const handleClose = async () => {
     console.log('[Tutorial] Fechando modal...');
     if (onClose) {
       onClose();
@@ -153,6 +153,9 @@ interface OnboardingModalProps {
 }
 
 export function OnboardingModal({ isConnected, onSaveCredentials, onMarkComplete, forceStep, onClose, tutorialMode = false }: OnboardingModalProps) {
+  // DEBUG
+  console.log('[OnboardingModal] Props recebidas:', { tutorialMode, forceStep, onClose: !!onClose });
+
   const {
     progress,
     isLoaded,
