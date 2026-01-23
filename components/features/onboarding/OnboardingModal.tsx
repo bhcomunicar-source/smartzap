@@ -23,6 +23,116 @@ import { SendFirstMessageStep } from './steps/SendFirstMessageStep';
 import { CreatePermanentTokenStep } from './steps/CreatePermanentTokenStep';
 import { DirectCredentialsStep } from './steps/DirectCredentialsStep';
 import { OnboardingCompleteStep } from './steps/OnboardingCompleteStep';
+import { Button } from '@/components/ui/button';
+
+// Renderiza step em modo tutorial (read-only, só visualização)
+function renderTutorialStep(step: OnboardingStep, onClose?: () => void) {
+  // Função que garante fechamento
+  const handleClose = () => {
+    console.log('[Tutorial] Fechando modal...');
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const closeButton = (
+    <div className="flex justify-end pt-4">
+      <Button onClick={handleClose}>Fechar</Button>
+    </div>
+  );
+
+  switch (step) {
+    case 'requirements':
+      return (
+        <RequirementsStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={1}
+          totalSteps={9}
+        />
+      );
+    case 'create-app':
+      return (
+        <CreateAppStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={2}
+          totalSteps={9}
+        />
+      );
+    case 'add-whatsapp':
+      return (
+        <AddWhatsAppStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={3}
+          totalSteps={9}
+        />
+      );
+    case 'credentials':
+      return (
+        <CredentialsStep
+          credentials={{ phoneNumberId: '', businessAccountId: '', accessToken: '' }}
+          onCredentialsChange={() => {}}
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={4}
+          totalSteps={9}
+        />
+      );
+    case 'test-connection':
+      return (
+        <TestConnectionStep
+          credentials={{ phoneNumberId: '', businessAccountId: '', accessToken: '' }}
+          onComplete={handleClose}
+          onBack={handleClose}
+          stepNumber={5}
+          totalSteps={9}
+        />
+      );
+    case 'configure-webhook':
+      return (
+        <ConfigureWebhookStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={6}
+          totalSteps={9}
+        />
+      );
+    case 'sync-templates':
+      return (
+        <SyncTemplatesStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={7}
+          totalSteps={9}
+        />
+      );
+    case 'send-first-message':
+      return (
+        <SendFirstMessageStep
+          onNext={handleClose}
+          onBack={handleClose}
+          stepNumber={8}
+          totalSteps={9}
+        />
+      );
+    case 'create-permanent-token':
+      return (
+        <CreatePermanentTokenStep
+          currentToken=""
+          onTokenUpdate={async () => {}}
+          onNext={handleClose}
+          onBack={handleClose}
+          onSkip={handleClose}
+          stepNumber={9}
+          totalSteps={9}
+        />
+      );
+    default:
+      return closeButton;
+  }
+}
 
 interface OnboardingModalProps {
   isConnected: boolean;
@@ -38,9 +148,11 @@ interface OnboardingModalProps {
   forceStep?: OnboardingStep;
   /** Callback para fechar o modal (limpa forceStep no pai) */
   onClose?: () => void;
+  /** Modo tutorial: mostra só o conteúdo + botão fechar, sem navegação */
+  tutorialMode?: boolean;
 }
 
-export function OnboardingModal({ isConnected, onSaveCredentials, onMarkComplete, forceStep, onClose }: OnboardingModalProps) {
+export function OnboardingModal({ isConnected, onSaveCredentials, onMarkComplete, forceStep, onClose, tutorialMode = false }: OnboardingModalProps) {
   const {
     progress,
     isLoaded,
@@ -55,41 +167,57 @@ export function OnboardingModal({ isConnected, onSaveCredentials, onMarkComplete
     goToStep,
   } = useOnboardingProgress();
 
-  // Se forceStep foi passado e é diferente do current, navega para ele
-  // Mas NÃO reseta se o usuário foi intencionalmente para 'complete' (fechar modal)
-  // CRÍTICO: Esperar localStorage carregar antes de forçar step (evita sobrescrever estado salvo)
-  React.useEffect(() => {
-    if (!isLoaded) return;
+  // ============================================================================
+  // MODO TUTORIAL: Simples - mostra o step e fecha quando clicar
+  // ============================================================================
+  if (tutorialMode && forceStep) {
+    const handleTutorialClose = () => {
+      console.log('[Tutorial] handleTutorialClose chamado');
+      onClose?.();
+    };
 
-    if (forceStep && progress.currentStep !== forceStep && progress.currentStep !== 'complete') {
-      goToStep(forceStep);
-    }
-  }, [isLoaded, forceStep, progress.currentStep, goToStep]);
+    return (
+      <Dialog open={true} onOpenChange={(open) => !open && handleTutorialClose()}>
+        <DialogContent
+          className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
+          overlayClassName="bg-black/80 backdrop-blur-sm"
+          showCloseButton={true}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Tutorial</DialogTitle>
+            <DialogDescription>Tutorial de configuração</DialogDescription>
+          </DialogHeader>
 
-  // O step atual é o forceStep (se fornecido) ou o do localStorage
-  const currentStep = forceStep || progress.currentStep;
+          {/* Botão de teste direto */}
+          <div className="mb-4 p-4 bg-red-500/20 rounded">
+            <button
+              onClick={() => {
+                console.log('[Tutorial] Botão TESTE clicado!');
+                alert('Clicou!');
+                handleTutorialClose();
+              }}
+              className="px-4 py-2 bg-red-500 text-white rounded"
+            >
+              BOTÃO TESTE - CLIQUE AQUI
+            </button>
+          </div>
 
-  // Steps que podem aparecer mesmo após conectado (fluxo pós-credenciais)
-  const postConnectionSteps: OnboardingStep[] = [
-    'configure-webhook',
-    'sync-templates',
-    'send-first-message',
-    'create-permanent-token',
-    'complete',
-  ];
-  const isPostConnectionStep = postConnectionSteps.includes(currentStep);
+          {renderTutorialStep(forceStep, handleTutorialClose)}
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  // Onboarding foi finalizado (usuário clicou em "Começar a usar")
+  // ============================================================================
+  // MODO ONBOARDING NORMAL: Fluxo completo com navegação
+  // ============================================================================
+  const currentStep = progress.currentStep;
+
+  // Onboarding foi finalizado
   const isFullyComplete = progress.completedAt !== null;
 
-  // Mostrar modal se:
-  // 1. Fluxo inicial: não completou E não está conectado
-  // 2. forceStep foi passado pelo pai (ex: clicou em "Configurar" no checklist)
-  // 3. Steps pós-conexão: mesmo após "completar" o wizard, permitir reabrir esses steps
-  const shouldShow = isLoaded && (
-    (!isFullyComplete && shouldShowOnboardingModal && !isConnected) || // Fluxo inicial
-    !!forceStep // Forçado pelo pai (checklist)
-  );
+  // Mostrar modal apenas no fluxo inicial de onboarding
+  const shouldShow = isLoaded && !isFullyComplete && shouldShowOnboardingModal && !isConnected;
 
   // Estado temporário para credenciais durante o wizard
   const [credentials, setCredentials] = React.useState({

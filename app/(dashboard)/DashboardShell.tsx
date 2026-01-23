@@ -14,7 +14,18 @@ import {
     FileText,
     MessageCircle,
     Sparkles,
-    Workflow
+    Workflow,
+    HelpCircle,
+    Webhook,
+    Key,
+    BookOpen,
+    CheckSquare,
+    AppWindow,
+    Phone,
+    KeyRound,
+    TestTube,
+    RefreshCw,
+    Send,
 } from 'lucide-react'
 import React from 'react'
 import { HealthStatus } from '@/lib/health-check'
@@ -29,6 +40,14 @@ import { PrefetchLink } from '@/components/ui/PrefetchLink'
 import { AccountAlertBanner } from '@/components/ui/AccountAlertBanner'
 import { DashboardSidebar, type NavItem } from '@/components/layout/DashboardSidebar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { DevModeToggle } from '@/components/ui/dev-mode-toggle'
 import { useDevMode } from '@/components/providers/DevModeProvider'
 import {
@@ -92,7 +111,7 @@ export function DashboardShell({
     const [forceModalStep, setForceModalStep] = useState<OnboardingStep | undefined>()
 
     // Onboarding status from database (fonte da verdade)
-    const { data: onboardingDbStatus, refetch: refetchOnboardingStatus } = useQuery({
+    const { data: onboardingDbStatus, refetch: refetchOnboardingStatus, isLoading: isOnboardingStatusLoading } = useQuery({
         queryKey: ['onboardingStatus'],
         queryFn: async () => {
             const response = await fetch('/api/settings/onboarding')
@@ -316,7 +335,8 @@ export function DashboardShell({
 
     // Determina se deve mostrar o modal de onboarding do WhatsApp
     // Mostra quando: infra OK E onboarding não marcado como completo no banco
-    const showWhatsAppOnboarding = !needsSetup && !isOnboardingCompletedInDb
+    // Só mostra modal de onboarding após carregar status do banco (evita flash)
+    const showWhatsAppOnboarding = !needsSetup && !isOnboardingStatusLoading && !isOnboardingCompletedInDb
 
     // Se WhatsApp já conectado mas onboarding não completo, força ir para step de webhook
     const onboardingForceStep = isWhatsAppConnected && !isOnboardingCompletedInDb
@@ -480,6 +500,94 @@ export function DashboardShell({
 
                     <div className="flex items-center gap-3">
                         <ChecklistMiniBadge isOnboardingCompletedInDb={isOnboardingCompletedInDb} />
+
+                        {/* Botão de Ajuda */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="p-1.5 text-[var(--ds-text-muted)] hover:text-[var(--ds-text-primary)] hover:bg-[var(--ds-bg-subtle)] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+                                    aria-label="Ajuda"
+                                >
+                                    <HelpCircle size={20} />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                                <DropdownMenuLabel>Tutoriais de Configuração</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('requirements')}
+                                    className="cursor-pointer"
+                                >
+                                    <CheckSquare className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">1.</span> Requisitos
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('create-app')}
+                                    className="cursor-pointer"
+                                >
+                                    <AppWindow className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">2.</span> Criar App Meta
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('add-whatsapp')}
+                                    className="cursor-pointer"
+                                >
+                                    <Phone className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">3.</span> Adicionar WhatsApp
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('credentials')}
+                                    className="cursor-pointer"
+                                >
+                                    <KeyRound className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">4.</span> Copiar Credenciais
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('test-connection')}
+                                    className="cursor-pointer"
+                                >
+                                    <TestTube className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">5.</span> Testar Conexão
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('configure-webhook')}
+                                    className="cursor-pointer"
+                                >
+                                    <Webhook className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">6.</span> Configurar Webhook
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('sync-templates')}
+                                    className="cursor-pointer"
+                                >
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">7.</span> Sincronizar Templates
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('send-first-message')}
+                                    className="cursor-pointer"
+                                >
+                                    <Send className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">8.</span> Enviar Mensagem Teste
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setForceModalStep('create-permanent-token')}
+                                    className="cursor-pointer"
+                                >
+                                    <Key className="mr-2 h-4 w-4" />
+                                    <span className="text-zinc-500 mr-2">9.</span> Token Permanente
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => window.open('https://developers.facebook.com/docs/whatsapp/cloud-api', '_blank')}
+                                    className="cursor-pointer"
+                                >
+                                    <BookOpen className="mr-2 h-4 w-4" />
+                                    Documentação Meta
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
                         <ThemeToggle compact />
                         <DevModeToggle />
                         <button className="relative group focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-2 rounded-md p-1" aria-label="Notificações (1 nova)">
@@ -490,13 +598,24 @@ export function DashboardShell({
                 </header>
 
                 {/* WhatsApp Onboarding Modal */}
-                {(showWhatsAppOnboarding || forceModalStep) && (
+                {showWhatsAppOnboarding && (
                     <OnboardingModal
                         isConnected={!!isWhatsAppConnected}
                         onSaveCredentials={handleSaveCredentials}
                         onMarkComplete={handleMarkOnboardingComplete}
-                        forceStep={forceModalStep || onboardingForceStep}
+                        forceStep={onboardingForceStep}
+                    />
+                )}
+
+                {/* Modal de Tutorial (menu de ajuda) */}
+                {forceModalStep && (
+                    <OnboardingModal
+                        isConnected={!!isWhatsAppConnected}
+                        onSaveCredentials={handleSaveCredentials}
+                        onMarkComplete={handleMarkOnboardingComplete}
+                        forceStep={forceModalStep}
                         onClose={() => setForceModalStep(undefined)}
+                        tutorialMode={true}
                     />
                 )}
 

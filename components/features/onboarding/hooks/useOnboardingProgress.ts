@@ -133,7 +133,9 @@ export function useOnboardingProgress() {
         ? prev.completedSteps
         : [...prev.completedSteps, prev.currentStep];
 
-      if (prev.path === 'guided') {
+      // Se path é 'guided' OU step atual está na sequência guiada (ex: aberto via menu de ajuda)
+      const isInGuidedSequence = guidedSteps.includes(prev.currentStep);
+      if (prev.path === 'guided' || isInGuidedSequence) {
         const currentIndex = guidedSteps.indexOf(prev.currentStep);
         const nextStepValue = guidedSteps[currentIndex + 1] || 'complete';
 
@@ -174,6 +176,12 @@ export function useOnboardingProgress() {
         const currentIndex = guidedSteps.indexOf(prev.currentStep);
         const prevStep = guidedSteps[Math.max(0, currentIndex - 1)];
         return { ...prev, currentStep: prevStep };
+      }
+
+      // Se aberto via menu de ajuda (path null mas em guided sequence), fecha o modal
+      const isInGuidedSequence = guidedSteps.includes(prev.currentStep);
+      if (isInGuidedSequence) {
+        return { ...prev, currentStep: 'complete' };
       }
 
       // Path direto volta para welcome

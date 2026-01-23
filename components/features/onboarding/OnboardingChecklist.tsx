@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useOnboardingProgress } from './hooks/useOnboardingProgress';
+import { useOnboardingProgress, type OnboardingStep } from './hooks/useOnboardingProgress';
 import { cn } from '@/lib/utils';
 import type { HealthStatus } from '@/lib/health-check';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ interface OnboardingChecklistProps {
   tokenExpiresIn?: string | null;
   onNavigate?: (path: string) => void;
   /** Callback para abrir o modal de onboarding em um step específico */
-  onOpenStep?: (step: 'configure-webhook') => void;
+  onOpenStep?: (step: OnboardingStep) => void;
 }
 
 export function OnboardingChecklist({

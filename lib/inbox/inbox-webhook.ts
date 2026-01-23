@@ -9,18 +9,25 @@
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { normalizePhoneNumber } from '@/lib/phone-formatter'
 import { inboxDb } from './inbox-db'
-import {
-  scheduleWithDebounce,
-  cancelDebounce,
-  processChatAgent,
-} from '@/lib/ai/agents/chat-agent'
+import { cancelDebounce } from '@/lib/ai/agents/chat-agent'
 import { sendWhatsAppMessage } from '@/lib/whatsapp-send'
+import { getRedis, REDIS_KEYS } from '@/lib/upstash/redis'
+import { Client } from '@upstash/workflow'
+import type { InboxAIWorkflowPayload } from './inbox-ai-workflow'
 import type {
-  ConversationMode,
   InboxConversation,
   InboxMessage,
-  AIAgent,
 } from '@/types'
+
+// Workflow client para disparar processamento de IA
+const getWorkflowClient = () => {
+  const token = process.env.QSTASH_TOKEN
+  if (!token) {
+    console.warn('[Inbox] QSTASH_TOKEN não configurado, workflow não disponível')
+    return null
+  }
+  return new Client({ token })
+}
 
 // =============================================================================
 // Types
@@ -125,153 +132,93 @@ export async function handleInboundMessage(
 }
 
 // =============================================================================
-// AI Processing Trigger (T047)
+// AI Processing Trigger (T047) - Via Upstash Workflow
 // =============================================================================
 
 /**
- * Trigger AI agent processing with debounce
- * Uses scheduleWithDebounce to wait for message bursts
+ * Trigger AI agent processing via durable workflow
+ *
+ * Usa Upstash Workflow ao invés de setTimeout para debounce durável.
+ * O workflow sobrevive à morte da função serverless.
+ *
+ * Fluxo:
+ * 1. Atualiza timestamp da última mensagem no Redis
+ * 2. Se não existe workflow pendente, dispara novo workflow
+ * 3. Se existe, o workflow em execução vai detectar a nova mensagem
  */
 async function triggerAIProcessing(
   conversation: InboxConversation,
   message: InboxMessage
 ): Promise<boolean> {
-  // Get the AI agent assigned to this conversation (or default)
-  const agent = await getAIAgentForConversation(conversation.id)
-  if (!agent) {
-    console.log('[Inbox] No AI agent configured, skipping AI processing')
+  const conversationId = conversation.id
+  const redis = getRedis()
+  const workflowClient = getWorkflowClient()
+
+  // Verifica se temos os clientes necessários
+  if (!workflowClient) {
+    console.log('[Inbox] Workflow client not available, skipping AI processing')
     return false
   }
 
-  // Check if agent is active
-  if (!agent.is_active) {
-    console.log('[Inbox] AI agent is not active, skipping')
-    return false
+  // Atualiza timestamp da última mensagem (para debounce distribuído)
+  if (redis) {
+    await redis.set(REDIS_KEYS.inboxLastMessage(conversationId), Date.now().toString())
   }
 
-  // Schedule with debounce (default 5s = 5000ms)
-  const debounceMs = agent.debounce_ms || 5000
-  const debounceSec = debounceMs / 1000
+  // Verifica se já existe workflow pendente para esta conversa
+  if (redis) {
+    const pendingWorkflow = await redis.get(REDIS_KEYS.inboxWorkflowPending(conversationId))
 
-  console.log(
-    `[Inbox] Scheduling AI response for conversation ${conversation.id} with ${debounceSec}s debounce`
-  )
-
-  // Don't await - let it run in background
-  scheduleWithDebounce(conversation.id, message.id, debounceSec).then(
-    async (accumulatedMessageIds) => {
-      try {
-        await processAIResponse(conversation, agent, accumulatedMessageIds)
-      } catch (error) {
-        console.error('[Inbox] AI processing failed:', error)
-      }
-    }
-  )
-
-  return true
-}
-
-/**
- * Process AI response after debounce
- * IMPORTANT: This runs in BACKGROUND after debounce, so we must NOT use
- * createClient() which calls cookies() - it hangs outside request context.
- * Use getSupabaseAdmin() or inboxDb (which uses admin internally) instead.
- */
-async function processAIResponse(
-  conversation: InboxConversation,
-  agent: AIAgent,
-  messageIds: string[]
-): Promise<void> {
-  // Refresh conversation state (might have changed during debounce)
-  const currentConversation = await inboxDb.getConversation(conversation.id)
-  if (!currentConversation) {
-    console.log('[Inbox] Conversation deleted during debounce, aborting AI processing')
-    return
-  }
-
-  // Check if mode changed during debounce
-  if (currentConversation.mode !== 'bot') {
-    console.log('[Inbox] Conversation mode changed to human, aborting AI processing')
-    return
-  }
-
-  // T066: Check if automation was paused during debounce
-  if (isAutomationPaused(currentConversation.automation_paused_until)) {
-    console.log(
-      `[Inbox] Automation paused during debounce until ${currentConversation.automation_paused_until}, aborting AI processing`
-    )
-    return
-  }
-
-  // Get recent messages for context
-  const { messages } = await inboxDb.listMessages(conversation.id, { limit: 20 })
-
-  // Process with support agent V2 (AI SDK v6 patterns)
-  const result = await processChatAgent({
-    agent,
-    conversation: currentConversation,
-    messages,
-  })
-
-  if (result.success && result.response) {
-    // Send response via WhatsApp
-    const sendResult = await sendWhatsAppMessage({
-      to: conversation.phone,
-      type: 'text',
-      text: result.response.message,
-    })
-
-    if (sendResult.success && sendResult.messageId) {
-      // Create outbound message in inbox
-      await inboxDb.createMessage({
-        conversation_id: conversation.id,
-        direction: 'outbound',
-        content: result.response.message,
-        message_type: 'text',
-        whatsapp_message_id: sendResult.messageId,
-        delivery_status: 'sent',
-        ai_response_id: result.logId || null,
-        ai_sentiment: result.response.sentiment,
-        ai_sources: result.response.sources || null,
-      })
-    }
-
-    // Handle handoff if needed
-    if (result.response.shouldHandoff) {
-      await handleAIHandoff(
-        currentConversation,
-        result.response.handoffReason,
-        result.response.handoffSummary
+    if (pendingWorkflow) {
+      // Workflow já existe, só atualizamos o timestamp (ele vai buscar msgs novas)
+      console.log(
+        `[Inbox] Workflow already pending for ${conversationId}, updated last message timestamp`
       )
+      return true
     }
-  } else if (result.response) {
-    // Error but we have a fallback response (auto-handoff)
-    const sendResult = await sendWhatsAppMessage({
-      to: conversation.phone,
-      type: 'text',
-      text: result.response.message,
+
+    // Marca workflow como pendente (TTL de 5 min para safety)
+    await redis.set(REDIS_KEYS.inboxWorkflowPending(conversationId), 'true', { ex: 300 })
+  }
+
+  // Dispara novo workflow
+  // Prioridade: NEXT_PUBLIC_APP_URL (manual) > VERCEL_PROJECT_PRODUCTION_URL > VERCEL_URL > localhost
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+    || (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`)
+    || 'http://localhost:3000'
+
+  const workflowUrl = `${baseUrl}/api/inbox/ai-workflow`
+
+  console.log(`[Inbox] Triggering AI workflow for ${conversationId} at ${workflowUrl}`)
+
+  try {
+    const payload: InboxAIWorkflowPayload = {
+      conversationId,
+      triggeredAt: Date.now(),
+    }
+
+    await workflowClient.trigger({
+      url: workflowUrl,
+      body: payload,
     })
 
-    if (sendResult.success && sendResult.messageId) {
-      await inboxDb.createMessage({
-        conversation_id: conversation.id,
-        direction: 'outbound',
-        content: result.response.message,
-        message_type: 'text',
-        whatsapp_message_id: sendResult.messageId,
-        delivery_status: 'sent',
-        ai_response_id: result.logId || null,
-      })
+    console.log(`[Inbox] AI workflow triggered successfully for ${conversationId}`)
+    return true
+  } catch (error) {
+    console.error('[Inbox] Failed to trigger AI workflow:', error)
+
+    // Limpa flag de pendente em caso de erro
+    if (redis) {
+      await redis.del(REDIS_KEYS.inboxWorkflowPending(conversationId))
     }
 
-    // Auto-handoff on error
-    await handleAIHandoff(
-      currentConversation,
-      result.response.handoffReason || result.error,
-      result.response.handoffSummary
-    )
+    return false
   }
 }
+
+// NOTE: processAIResponse foi movido para lib/inbox/inbox-ai-workflow.ts
+// O workflow agora gerencia todo o processamento de IA de forma durável.
 
 /**
  * Handle AI handoff to human
@@ -389,71 +336,8 @@ async function findContactId(phone: string): Promise<string | null> {
   return data?.id || null
 }
 
-/**
- * Check if AI agents are globally enabled
- * Returns true if enabled (default), false if disabled
- */
-async function isAIAgentsGloballyEnabled(): Promise<boolean> {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) return true // Default to enabled if no supabase
-
-  const { data, error } = await supabase
-    .from('settings')
-    .select('value')
-    .eq('key', 'ai_agents_global_enabled')
-    .single()
-
-  if (error || !data) return true // Default to enabled
-  return data.value !== 'false'
-}
-
-/**
- * Get AI agent for conversation
- * First checks global toggle, then conversation assignment, then default agent
- */
-async function getAIAgentForConversation(
-  conversationId: string
-): Promise<AIAgent | null> {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    console.error('[Inbox] Supabase admin client not available')
-    return null
-  }
-
-  // Check global toggle first
-  const isEnabled = await isAIAgentsGloballyEnabled()
-  if (!isEnabled) {
-    console.log('[Inbox] AI agents globally disabled, skipping')
-    return null
-  }
-
-  // Check if conversation has an assigned agent
-  const { data: conversation } = await supabase
-    .from('inbox_conversations')
-    .select('ai_agent_id')
-    .eq('id', conversationId)
-    .single()
-
-  if (conversation?.ai_agent_id) {
-    const { data: agent } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .eq('id', conversation.ai_agent_id)
-      .single()
-
-    return agent as AIAgent | null
-  }
-
-  // Fall back to default active agent
-  const { data: defaultAgent } = await supabase
-    .from('ai_agents')
-    .select('*')
-    .eq('is_active', true)
-    .eq('is_default', true)
-    .single()
-
-  return defaultAgent as AIAgent | null
-}
+// NOTE: isAIAgentsGloballyEnabled e getAIAgentForConversation foram movidos para
+// lib/inbox/inbox-ai-workflow.ts como parte do processamento durável.
 
 /**
  * Map WhatsApp message types to inbox message types
