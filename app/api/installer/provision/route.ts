@@ -83,18 +83,18 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: 'validate_vercel', title: 'Validando Vercel...', subtitle: 'Verificando token e projeto', weight: 5, returnToStep: 2 },
-  { id: 'validate_supabase', title: 'Validando Supabase...', subtitle: 'Verificando PAT', weight: 5, returnToStep: 3 },
-  { id: 'create_project', title: 'Criando projeto...', subtitle: 'Configurando Supabase', weight: 10, returnToStep: 3 },
-  { id: 'wait_project', title: 'Aguardando projeto...', subtitle: 'Inicializando banco de dados', weight: 15, returnToStep: 3 },
-  { id: 'resolve_keys', title: 'Obtendo credenciais...', subtitle: 'Resolvendo chaves de API', weight: 5, returnToStep: 3 },
-  { id: 'validate_qstash', title: 'Validando QStash...', subtitle: 'Verificando token', weight: 5, returnToStep: 4 },
-  { id: 'validate_redis', title: 'Validando Redis...', subtitle: 'Testando conexão', weight: 5, returnToStep: 5 },
-  { id: 'setup_envs', title: 'Configurando ambiente...', subtitle: 'Definindo variáveis', weight: 10, returnToStep: 2 },
-  { id: 'migrations', title: 'Aplicando migrations...', subtitle: 'Criando estrutura do banco', weight: 15, returnToStep: 3 },
-  { id: 'bootstrap', title: 'Criando admin...', subtitle: 'Configurando sua conta', weight: 10, returnToStep: 1 },
-  { id: 'redeploy', title: 'Fazendo deploy...', subtitle: 'Aplicando configurações', weight: 10, returnToStep: 2 },
-  { id: 'wait_deploy', title: 'Finalizando...', subtitle: 'Aguardando deploy', weight: 5, returnToStep: 2 },
+  { id: 'validate_vercel', title: 'Conectando Link Neural...', subtitle: 'Autenticando com servidor de deploy', weight: 5, returnToStep: 2 },
+  { id: 'validate_supabase', title: 'Escaneando Memória Base...', subtitle: 'Verificando credenciais Supabase', weight: 5, returnToStep: 3 },
+  { id: 'create_project', title: 'Criando Unidade...', subtitle: 'Alocando nova instância de memória', weight: 10, returnToStep: 3 },
+  { id: 'wait_project', title: 'Incubando Unidade...', subtitle: 'Aguardando células se multiplicarem', weight: 15, returnToStep: 3 },
+  { id: 'resolve_keys', title: 'Extraindo DNA...', subtitle: 'Resolvendo chaves de acesso', weight: 5, returnToStep: 3 },
+  { id: 'validate_qstash', title: 'Calibrando Transmissão...', subtitle: 'Verificando canal de mensagens', weight: 5, returnToStep: 4 },
+  { id: 'validate_redis', title: 'Inicializando Cache...', subtitle: 'Testando memória temporária', weight: 5, returnToStep: 5 },
+  { id: 'setup_envs', title: 'Implantando Memórias...', subtitle: 'Configurando variáveis de ambiente', weight: 10, returnToStep: 2 },
+  { id: 'migrations', title: 'Estruturando Sinapses...', subtitle: 'Criando conexões neurais do banco', weight: 15, returnToStep: 3 },
+  { id: 'bootstrap', title: 'Registrando Baseline...', subtitle: 'Criando identidade administrativa', weight: 10, returnToStep: 1 },
+  { id: 'redeploy', title: 'Ativando Replicante...', subtitle: 'Fazendo deploy das configurações', weight: 10, returnToStep: 2 },
+  { id: 'wait_deploy', title: 'Despertar Iminente...', subtitle: 'Finalizando processo de incubação', weight: 5, returnToStep: 2 },
 ];
 
 // =============================================================================
@@ -173,28 +173,19 @@ async function findOrCreateSupabaseProject(
   pat: string,
   onProgress: (fraction: number) => Promise<void>
 ): Promise<{ projectRef: string; projectUrl: string; dbPass: string; isNew: boolean }> {
-  // List existing projects
+  // SEMPRE cria um projeto novo para evitar herdar lixo de instalações anteriores
+  // Se "smartzap" já existe, tenta smartzap-v2, smartzap-v3, etc.
+
   await onProgress(0.1);
+
+  // List existing projects to find available name
   const projectsResult = await listSupabaseProjects({ accessToken: pat });
+  const existingNames = new Set(
+    projectsResult.ok
+      ? projectsResult.projects.map((p) => p.name?.toLowerCase())
+      : []
+  );
 
-  if (projectsResult.ok && projectsResult.projects.length > 0) {
-    // Find smartzap project
-    const smartzapProject = projectsResult.projects.find(
-      (p) => p.name?.toLowerCase().includes('smartzap') && p.status === 'ACTIVE_HEALTHY'
-    );
-
-    if (smartzapProject) {
-      await onProgress(1);
-      return {
-        projectRef: smartzapProject.ref,
-        projectUrl: `https://${smartzapProject.ref}.supabase.co`,
-        dbPass: '', // Will need to be resolved differently for existing projects
-        isNew: false,
-      };
-    }
-  }
-
-  // Create new project
   await onProgress(0.2);
 
   // Generate DB password
@@ -203,7 +194,7 @@ async function findOrCreateSupabaseProject(
   crypto.getRandomValues(array);
   const dbPass = Array.from(array, (b) => charset[b % charset.length]).join('');
 
-  // Get first org with available slot
+  // Get first org
   const orgsRes = await fetch('https://api.supabase.com/v1/organizations', {
     headers: { Authorization: `Bearer ${pat}` },
   });
@@ -220,34 +211,53 @@ async function findOrCreateSupabaseProject(
   const org = orgs[0];
   await onProgress(0.3);
 
-  // Create project with retry for name conflicts
+  // Find available project name (smartzap, smartzap-v2, smartzap-v3, ...)
   let projectName = 'smartzap';
-  let attempt = 0;
-  let createResult: Awaited<ReturnType<typeof createSupabaseProject>> | null = null;
+  let version = 1;
 
-  while (attempt < 10) {
-    createResult = await createSupabaseProject({
-      accessToken: pat,
-      organizationSlug: org.slug || org.id,
-      name: projectName,
-      dbPass,
-      regionSmartGroup: 'americas', // São Paulo
-    });
+  while (existingNames.has(projectName.toLowerCase()) && version < 100) {
+    version++;
+    projectName = `smartzap-v${version}`;
+  }
 
-    if (createResult.ok) break;
+  await onProgress(0.4);
 
+  // Create project
+  const createResult = await createSupabaseProject({
+    accessToken: pat,
+    organizationSlug: org.slug || org.id,
+    name: projectName,
+    dbPass,
+    regionSmartGroup: 'americas', // São Paulo
+  });
+
+  if (!createResult.ok) {
+    // Handle race condition where name was taken between check and create
     if (createResult.status === 409) {
-      attempt++;
-      projectName = `smartzap-v${attempt + 1}`;
-      await onProgress(0.3 + attempt * 0.05);
-      continue;
+      // Try with timestamp suffix as fallback
+      const fallbackName = `smartzap-${Date.now().toString(36)}`;
+      const retryResult = await createSupabaseProject({
+        accessToken: pat,
+        organizationSlug: org.slug || org.id,
+        name: fallbackName,
+        dbPass,
+        regionSmartGroup: 'americas',
+      });
+
+      if (!retryResult.ok) {
+        throw new Error(retryResult.error || 'Falha ao criar projeto Supabase');
+      }
+
+      await onProgress(1);
+      return {
+        projectRef: retryResult.projectRef,
+        projectUrl: `https://${retryResult.projectRef}.supabase.co`,
+        dbPass,
+        isNew: true,
+      };
     }
 
     throw new Error(createResult.error || 'Falha ao criar projeto Supabase');
-  }
-
-  if (!createResult?.ok) {
-    throw new Error('Não foi possível criar o projeto após várias tentativas');
   }
 
   await onProgress(1);
@@ -265,22 +275,32 @@ async function findOrCreateSupabaseProject(
 // =============================================================================
 
 export async function POST(req: Request) {
+  console.log('[provision] 🚀 POST /api/installer/provision iniciado');
+
   // Check if installer is enabled
   if (process.env.INSTALLER_ENABLED === 'false') {
+    console.log('[provision] ❌ Installer desabilitado');
     return new Response(JSON.stringify({ error: 'Installer desabilitado' }), { status: 403 });
   }
 
   // Parse and validate payload
-  const raw = await req.json().catch(() => null);
+  console.log('[provision] 📦 Parseando payload...');
+  const raw = await req.json().catch((e) => {
+    console.log('[provision] ❌ Erro ao parsear JSON:', e);
+    return null;
+  });
+
   const parsed = ProvisionSchema.safeParse(raw);
 
   if (!parsed.success) {
+    console.log('[provision] ❌ Payload inválido:', parsed.error.flatten());
     return new Response(
       JSON.stringify({ error: 'Payload inválido', details: parsed.error.flatten() }),
       { status: 400 }
     );
   }
 
+  console.log('[provision] ✅ Payload válido');
   const { identity, vercel, supabase, qstash, redis } = parsed.data;
 
   // Create SSE stream
@@ -292,8 +312,12 @@ export async function POST(req: Request) {
     await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
   };
 
+  console.log('[provision] 🔄 Iniciando stream SSE...');
+
   // Run provisioning in background
   (async () => {
+    console.log('[provision] ⚡ Background task iniciada');
+
     let stepIndex = 0;
     let vercelProject: { projectId: string; projectName: string; teamId?: string } | null = null;
     let supabaseProject: { projectRef: string; projectUrl: string; dbPass: string; isNew: boolean } | null = null;
@@ -303,6 +327,7 @@ export async function POST(req: Request) {
 
     try {
       // Step 1: Validate Vercel token
+      console.log('[provision] 📍 Step 1: Validate Vercel');
       const step1 = STEPS[stepIndex];
       await sendEvent({
         type: 'progress',
@@ -343,42 +368,40 @@ export async function POST(req: Request) {
           type: 'progress',
           progress: calculateProgress(stepIndex, fraction),
           title: step3.title,
-          subtitle: fraction < 0.3 ? 'Verificando projetos existentes...' : 'Criando novo projeto...',
+          subtitle: fraction < 0.3 ? 'Escaneando setores ocupados...' : 'Alocando nova unidade de memória...',
         });
       });
       stepIndex++;
 
-      // Step 4: Wait for project to be ready
-      if (supabaseProject.isNew) {
-        const step4 = STEPS[stepIndex];
-        await sendEvent({
-          type: 'progress',
-          progress: calculateProgress(stepIndex),
-          title: step4.title,
-          subtitle: step4.subtitle,
+      // Step 4: Wait for project to be ready (sempre aguarda - projeto é sempre novo)
+      const step4 = STEPS[stepIndex];
+      await sendEvent({
+        type: 'progress',
+        progress: calculateProgress(stepIndex),
+        title: step4.title,
+        subtitle: step4.subtitle,
+      });
+
+      const startTime = Date.now();
+      const timeoutMs = 210_000;
+
+      while (Date.now() - startTime < timeoutMs) {
+        const ready = await waitForSupabaseProjectReady({
+          accessToken: supabase.pat,
+          projectRef: supabaseProject.projectRef,
+          timeoutMs: 4_000,
+          pollMs: 4_000,
         });
 
-        const startTime = Date.now();
-        const timeoutMs = 210_000;
+        if (ready.ok) break;
 
-        while (Date.now() - startTime < timeoutMs) {
-          const ready = await waitForSupabaseProjectReady({
-            accessToken: supabase.pat,
-            projectRef: supabaseProject.projectRef,
-            timeoutMs: 4_000,
-            pollMs: 4_000,
-          });
-
-          if (ready.ok) break;
-
-          const fraction = Math.min((Date.now() - startTime) / timeoutMs, 0.95);
-          await sendEvent({
-            type: 'progress',
-            progress: calculateProgress(stepIndex, fraction),
-            title: step4.title,
-            subtitle: `Aguardando inicialização... (${Math.round(fraction * 100)}%)`,
-          });
-        }
+        const fraction = Math.min((Date.now() - startTime) / timeoutMs, 0.95);
+        await sendEvent({
+          type: 'progress',
+          progress: calculateProgress(stepIndex, fraction),
+          title: step4.title,
+          subtitle: `Células se multiplicando... (${Math.round(fraction * 100)}%)`,
+        });
       }
       stepIndex++;
 
@@ -546,7 +569,7 @@ export async function POST(req: Request) {
               type: 'progress',
               progress: calculateProgress(stepIndex, fraction),
               title: step12.title,
-              subtitle: `Deploy em andamento... (${Math.round(fraction * 100)}%)`,
+              subtitle: `Consciência emergindo... (${Math.round(fraction * 100)}%)`,
             });
           },
         });

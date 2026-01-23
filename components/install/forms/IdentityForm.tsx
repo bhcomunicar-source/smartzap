@@ -34,8 +34,8 @@ function validatePassword(password: string): {
 }
 
 /**
- * Form de identidade simplificado.
- * Coleta nome, email e senha. Sem validação de API.
+ * Form de identidade - Tema Blade Runner.
+ * "Registro de Identidade" estilo Voight-Kampff.
  */
 export function IdentityForm({ data, onComplete }: FormProps) {
   const [name, setName] = useState(data.name);
@@ -60,22 +60,22 @@ export function IdentityForm({ data, onComplete }: FormProps) {
     setError(null);
 
     if (!name.trim() || name.trim().length < VALIDATION.NAME_MIN_LENGTH) {
-      setError(`Nome deve ter no mínimo ${VALIDATION.NAME_MIN_LENGTH} caracteres`);
+      setError(`Designação requer mínimo ${VALIDATION.NAME_MIN_LENGTH} caracteres`);
       return;
     }
 
     if (!isValidEmail(email)) {
-      setError('Email inválido (ex: nome@email.com)');
+      setError('Código de comunicação inválido');
       return;
     }
 
     if (!validation.valid) {
-      setError(`Senha deve ter no mínimo ${VALIDATION.PASSWORD_MIN_LENGTH} caracteres, 1 letra e 1 número`);
+      setError(`Código de acesso: mínimo ${VALIDATION.PASSWORD_MIN_LENGTH} chars, 1 letra, 1 número`);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Senhas não conferem');
+      setError('Códigos não correspondem');
       return;
     }
 
@@ -83,11 +83,12 @@ export function IdentityForm({ data, onComplete }: FormProps) {
   };
 
   const inputClass = cn(
-    'w-full pl-10 pr-4 py-3 rounded-xl',
-    'bg-zinc-800/50 border border-zinc-700',
-    'text-zinc-100 placeholder:text-zinc-500',
-    'focus:border-emerald-500 focus:outline-none',
-    'focus:shadow-[0_0_0_3px_theme(colors.emerald.500/0.15)]',
+    'w-full pl-10 pr-4 py-3 rounded-lg',
+    'bg-[var(--br-void-black)]/80 border border-[var(--br-dust-gray)]/50',
+    'text-[var(--br-hologram-white)] placeholder:text-[var(--br-dust-gray)]',
+    'font-mono text-sm',
+    'focus:border-[var(--br-neon-cyan)] focus:outline-none',
+    'focus:shadow-[0_0_15px_var(--br-neon-cyan)/0.3]',
     'transition-all duration-200'
   );
 
@@ -95,23 +96,29 @@ export function IdentityForm({ data, onComplete }: FormProps) {
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Header */}
       <div className="flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-          <User className="w-7 h-7 text-zinc-400" />
+        <div className="w-14 h-14 rounded-full bg-[var(--br-deep-navy)] border border-[var(--br-neon-cyan)]/30 flex items-center justify-center">
+          <User className="w-7 h-7 text-[var(--br-neon-cyan)]" />
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-zinc-100">Crie sua conta</h2>
-        <p className="mt-1 text-sm text-zinc-400">Dados para acessar o painel</p>
+        <h2 className="mt-4 text-xl font-bold tracking-wide text-[var(--br-hologram-white)] uppercase">
+          Registro de Identidade
+        </h2>
+        <p className="mt-1 text-sm text-[var(--br-muted-cyan)] font-mono">
+          Autenticação requerida
+        </p>
       </div>
 
       {/* Nome */}
       <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">Seu nome</label>
+        <label className="block text-xs font-mono text-[var(--br-muted-cyan)] mb-2 uppercase tracking-wider">
+          {'>'} Designação
+        </label>
         <div className="relative">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--br-dust-gray)]" />
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Como devemos te chamar?"
+            placeholder="Como devemos chamá-lo?"
             autoFocus
             className={inputClass}
           />
@@ -120,9 +127,11 @@ export function IdentityForm({ data, onComplete }: FormProps) {
 
       {/* Email */}
       <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">Email</label>
+        <label className="block text-xs font-mono text-[var(--br-muted-cyan)] mb-2 uppercase tracking-wider">
+          {'>'} Código de Comunicação
+        </label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--br-dust-gray)]" />
           <input
             type="email"
             value={email}
@@ -136,29 +145,31 @@ export function IdentityForm({ data, onComplete }: FormProps) {
       {/* Password */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-zinc-300">Senha</label>
+          <label className="block text-xs font-mono text-[var(--br-muted-cyan)] uppercase tracking-wider">
+            {'>'} Código de Acesso
+          </label>
           <button
             type="button"
             onClick={handleSuggestPassword}
-            className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+            className="flex items-center gap-1 text-xs font-mono text-[var(--br-neon-magenta)] hover:text-[var(--br-neon-cyan)] transition-colors"
           >
             <Sparkles className="w-3 h-3" />
-            Sugerir senha forte
+            gerar código forte
           </button>
         </div>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--br-dust-gray)]" />
           <input
             type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Mínimo 8 caracteres"
-            className={cn(inputClass, 'pr-10', showPassword && 'font-mono text-sm')}
+            className={cn(inputClass, 'pr-10')}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--br-dust-gray)] hover:text-[var(--br-muted-cyan)]"
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -168,16 +179,16 @@ export function IdentityForm({ data, onComplete }: FormProps) {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="mt-2 flex gap-3 text-xs"
+            className="mt-2 flex gap-3 text-xs font-mono"
           >
-            <span className={validation.checks.minLen ? 'text-emerald-400' : 'text-zinc-500'}>
-              {validation.checks.minLen ? '✓' : '○'} 8+ chars
+            <span className={validation.checks.minLen ? 'text-[var(--br-neon-cyan)]' : 'text-[var(--br-dust-gray)]'}>
+              {validation.checks.minLen ? '[OK]' : '[--]'} 8+ chars
             </span>
-            <span className={validation.checks.hasLetter ? 'text-emerald-400' : 'text-zinc-500'}>
-              {validation.checks.hasLetter ? '✓' : '○'} Letra
+            <span className={validation.checks.hasLetter ? 'text-[var(--br-neon-cyan)]' : 'text-[var(--br-dust-gray)]'}>
+              {validation.checks.hasLetter ? '[OK]' : '[--]'} letra
             </span>
-            <span className={validation.checks.hasNumber ? 'text-emerald-400' : 'text-zinc-500'}>
-              {validation.checks.hasNumber ? '✓' : '○'} Número
+            <span className={validation.checks.hasNumber ? 'text-[var(--br-neon-cyan)]' : 'text-[var(--br-dust-gray)]'}>
+              {validation.checks.hasNumber ? '[OK]' : '[--]'} número
             </span>
           </motion.div>
         )}
@@ -185,20 +196,22 @@ export function IdentityForm({ data, onComplete }: FormProps) {
 
       {/* Confirm Password */}
       <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">Confirmar senha</label>
+        <label className="block text-xs font-mono text-[var(--br-muted-cyan)] mb-2 uppercase tracking-wider">
+          {'>'} Confirmar Código
+        </label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--br-dust-gray)]" />
           <input
             type={showConfirm ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Repita a senha"
-            className={cn(inputClass, 'pr-10', showConfirm && 'font-mono text-sm')}
+            placeholder="Repita o código"
+            className={cn(inputClass, 'pr-10')}
           />
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--br-dust-gray)] hover:text-[var(--br-muted-cyan)]"
           >
             {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -208,29 +221,35 @@ export function IdentityForm({ data, onComplete }: FormProps) {
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className={cn('mt-2 text-xs', password === confirmPassword ? 'text-emerald-400' : 'text-red-400')}
+            className={cn('mt-2 text-xs font-mono', password === confirmPassword ? 'text-[var(--br-neon-cyan)]' : 'text-[var(--br-neon-pink)]')}
           >
-            {password === confirmPassword ? '✓ Senhas conferem' : '✗ Senhas não conferem'}
+            {password === confirmPassword ? '[OK] códigos correspondem' : '[!] códigos não correspondem'}
           </motion.p>
         )}
       </div>
 
       {/* Error */}
       {error && (
-        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-red-400 text-center">
-          {error}
+        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-sm font-mono text-[var(--br-neon-pink)] text-center">
+          {'! '}{error}
         </motion.p>
       )}
 
       {/* Submit */}
       <Button
         type="submit"
-        variant="brand"
         size="lg"
-        className="w-full"
+        className={cn(
+          'w-full font-mono uppercase tracking-wider',
+          'bg-[var(--br-neon-cyan)] hover:bg-[var(--br-neon-cyan)]/80',
+          'text-[var(--br-void-black)] font-bold',
+          'shadow-[0_0_20px_var(--br-neon-cyan)/0.4]',
+          'hover:shadow-[0_0_30px_var(--br-neon-cyan)/0.6]',
+          'transition-all duration-200'
+        )}
         disabled={!name.trim() || !isValidEmail(email) || !validation.valid || password !== confirmPassword}
       >
-        Continuar
+        Registrar Baseline
       </Button>
     </form>
   );

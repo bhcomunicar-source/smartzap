@@ -13,13 +13,8 @@ interface SuccessCheckmarkProps {
 }
 
 /**
- * Animação de checkmark que aparece após validação bem-sucedida.
- *
- * Características:
- * - Círculo com scale animation
- * - Glow ring pulsante
- * - Checkmark com draw animation
- * - Auto-callback após delay
+ * Animação de checkmark após validação bem-sucedida.
+ * Tema Blade Runner - "Autenticidade confirmada"
  */
 export function SuccessCheckmark({
   onComplete,
@@ -49,9 +44,9 @@ export function SuccessCheckmark({
     >
       {/* Circle with checkmark */}
       <div className="relative">
-        {/* Glow ring expanding */}
+        {/* Glow ring expanding - cyan */}
         <motion.div
-          className="absolute inset-0 rounded-full bg-emerald-500/30"
+          className="absolute inset-0 rounded-full bg-[var(--br-neon-cyan)]/30"
           initial={{ scale: 1, opacity: 0.5 }}
           animate={{
             scale: [1, 1.8, 1.8],
@@ -76,9 +71,10 @@ export function SuccessCheckmark({
           }}
           className={cn(
             'w-20 h-20 rounded-full',
-            'bg-emerald-500/20',
-            'border-2 border-emerald-500',
-            'flex items-center justify-center'
+            'bg-[var(--br-neon-cyan)]/20',
+            'border-2 border-[var(--br-neon-cyan)]',
+            'flex items-center justify-center',
+            'shadow-[0_0_30px_var(--br-neon-cyan)/0.4]'
           )}
         >
           {/* Checkmark icon */}
@@ -88,7 +84,7 @@ export function SuccessCheckmark({
             transition={{ delay: 0.2, duration: 0.3 }}
           >
             <Check
-              className="w-10 h-10 text-emerald-500"
+              className="w-10 h-10 text-[var(--br-neon-cyan)]"
               strokeWidth={3}
             />
           </motion.div>
@@ -100,20 +96,20 @@ export function SuccessCheckmark({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="mt-4 text-lg font-medium text-zinc-100"
+        className="mt-4 text-lg font-mono font-medium text-[var(--br-hologram-white)]"
       >
         {message}
       </motion.p>
 
-      {/* Subtle progress bar for visual feedback */}
+      {/* Progress bar with glow */}
       <motion.div
-        className="mt-4 h-1 bg-zinc-800 rounded-full overflow-hidden w-32"
+        className="mt-4 h-1 bg-[var(--br-dust-gray)]/30 rounded-full overflow-hidden w-32"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
       >
         <motion.div
-          className="h-full bg-emerald-500"
+          className="h-full bg-gradient-to-r from-[var(--br-neon-cyan)] to-[var(--br-neon-magenta)]"
           initial={{ width: '0%' }}
           animate={{ width: '100%' }}
           transition={{ duration: delay / 1000, ease: 'linear' }}

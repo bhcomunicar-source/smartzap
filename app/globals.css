@@ -958,6 +958,221 @@ textarea:focus-visible {
 }
 
 /* ================================
+   BLADE RUNNER INSTALLER THEME
+   ================================ */
+
+/* Blade Runner Color Palette */
+.blade-runner {
+  /* Primary neon colors */
+  --br-neon-cyan: #0ABDC6;
+  --br-neon-magenta: #EA00D9;
+  --br-neon-orange: #F78B04;
+  --br-neon-pink: #FF3366;
+
+  /* Backgrounds */
+  --br-void-black: #0A0A0F;
+  --br-deep-navy: #091833;
+  --br-dark-teal: #0D1B2A;
+
+  /* Text */
+  --br-hologram-white: #E0F7FA;
+  --br-muted-cyan: #4A9BA8;
+  --br-dust-gray: #3D4F5F;
+
+  /* Glow effects */
+  --br-glow-cyan: 0 0 5px rgba(10, 189, 198, 0.5), 0 0 20px rgba(10, 189, 198, 0.3), 0 0 40px rgba(10, 189, 198, 0.1);
+  --br-glow-magenta: 0 0 5px rgba(234, 0, 217, 0.5), 0 0 20px rgba(234, 0, 217, 0.3), 0 0 40px rgba(234, 0, 217, 0.1);
+  --br-glow-orange: 0 0 5px rgba(247, 139, 4, 0.5), 0 0 20px rgba(247, 139, 4, 0.3);
+}
+
+/* Rain effect background */
+.br-rain-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.br-rain-drop {
+  position: absolute;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--br-neon-cyan), transparent);
+  opacity: 0.3;
+  animation: br-rain-fall linear infinite;
+}
+
+@keyframes br-rain-fall {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* Scanlines overlay */
+.br-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(10, 189, 198, 0.02) 2px,
+    rgba(10, 189, 198, 0.02) 4px
+  );
+  animation: br-scanline-scroll 30s linear infinite;
+}
+
+@keyframes br-scanline-scroll {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 100px;
+  }
+}
+
+/* Neon glow text */
+.br-text-glow-cyan {
+  color: var(--br-neon-cyan);
+  text-shadow: 0 0 5px var(--br-neon-cyan), 0 0 10px var(--br-neon-cyan), 0 0 20px rgba(10, 189, 198, 0.5);
+}
+
+.br-text-glow-magenta {
+  color: var(--br-neon-magenta);
+  text-shadow: 0 0 5px var(--br-neon-magenta), 0 0 10px var(--br-neon-magenta), 0 0 20px rgba(234, 0, 217, 0.5);
+}
+
+/* Neon border glow */
+.br-border-glow-cyan {
+  border-color: var(--br-neon-cyan);
+  box-shadow: var(--br-glow-cyan);
+}
+
+.br-border-glow-magenta {
+  border-color: var(--br-neon-magenta);
+  box-shadow: var(--br-glow-magenta);
+}
+
+/* Voight-Kampff eye scanning animation */
+@keyframes br-eye-scan {
+  0%, 100% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+}
+
+.br-eye-scan {
+  animation: br-eye-scan 2s ease-in-out infinite;
+}
+
+/* Pulse glow animation */
+@keyframes br-pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+    box-shadow: 0 0 5px var(--br-neon-cyan);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 20px var(--br-neon-cyan), 0 0 40px rgba(10, 189, 198, 0.5);
+  }
+}
+
+.br-pulse-glow {
+  animation: br-pulse-glow 2s ease-in-out infinite;
+}
+
+/* Glitch effect for errors */
+@keyframes br-glitch {
+  0% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+.br-glitch {
+  animation: br-glitch 0.3s ease-in-out;
+}
+
+/* Terminal cursor blink */
+@keyframes br-cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.br-cursor {
+  animation: br-cursor-blink 1s step-end infinite;
+}
+
+/* Progress bar segments (not smooth) */
+.br-progress-segment {
+  background: linear-gradient(
+    90deg,
+    var(--br-neon-cyan) 0%,
+    var(--br-neon-cyan) 90%,
+    transparent 90%,
+    transparent 100%
+  );
+  background-size: 10px 100%;
+}
+
+/* Input focus transition */
+.br-input-focus {
+  transition: all 0.3s ease;
+}
+
+.br-input-focus:focus-within {
+  border-color: var(--br-neon-magenta);
+  box-shadow: 0 0 5px var(--br-neon-magenta), 0 0 15px rgba(234, 0, 217, 0.3);
+}
+
+/* Card with gradient border */
+.br-card {
+  background: linear-gradient(135deg, var(--br-deep-navy), var(--br-void-black));
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+
+.br-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--br-neon-cyan), var(--br-neon-magenta));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ================================
    CHAT / INBOX ANIMATIONS
    ================================ */
 

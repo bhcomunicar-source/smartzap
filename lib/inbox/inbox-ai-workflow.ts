@@ -22,7 +22,7 @@ import type { AIAgent, InboxConversation, InboxMessage } from '@/types'
 import type { SupportAgentResult } from '@/lib/ai/agents/chat-agent'
 
 // Constantes
-const DEBOUNCE_SECONDS = 5
+const DEBOUNCE_SECONDS = 2
 const MAX_DEBOUNCE_LOOPS = 10 // Evita loop infinito (máx 50s de espera)
 const AI_CALL_TIMEOUT_SECONDS = 120 // 2 minutos para chamada de IA
 const AI_CALL_RETRIES = 2 // Número de retries em caso de falha
@@ -183,24 +183,26 @@ export async function processInboxAIWorkflow(context: WorkflowContext) {
   }
 
   const aiApiUrl = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/api/internal/ai-generate`
+  const apiKey = process.env.SMARTZAP_API_KEY || ''
   console.log(`[inbox-ai-workflow] Calling AI API: ${aiApiUrl}`)
 
   const aiCallResult = await context.call<SupportAgentResult>('process-ai', {
     url: aiApiUrl,
     method: 'POST',
-    body: JSON.stringify({
+    body: {
       agent,
       conversation,
       messages,
-    }),
+    },
     headers: {
       'content-type': 'application/json',
-      'x-api-key': process.env.SMARTZAP_API_KEY || '',
+      'x-api-key': apiKey,
     },
     timeout: AI_CALL_TIMEOUT_SECONDS,
     retries: AI_CALL_RETRIES,
-    retryDelay: 'pow(2, retried) * 1000', // Exponential backoff: 1s, 2s, 4s
   })
+
+  console.log(`[inbox-ai-workflow] AI API returned status: ${aiCallResult.status}`)
 
   // Processa resultado da chamada HTTP
   const aiResult = (() => {

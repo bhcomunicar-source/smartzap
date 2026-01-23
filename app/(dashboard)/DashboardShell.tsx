@@ -63,6 +63,8 @@ import {
     SuccessBanner,
     CredentialsModal,
     SetupChecklist,
+    GuidedTour,
+    useGuidedTour,
 } from '@/components/features/setup'
 import { useSetupStatus } from '@/hooks/useSetupStatus'
 
@@ -122,6 +124,10 @@ export function DashboardShell({
 
     // Estado para mostrar banner de sucesso após conexão
     const [showSuccessBanner, setShowSuccessBanner] = useState(false)
+
+    // Estado para mostrar tour guiado após primeira conexão
+    const [showGuidedTour, setShowGuidedTour] = useState(false)
+    const guidedTour = useGuidedTour()
 
     // Onboarding status from database (fonte da verdade)
     const { data: onboardingDbStatus, refetch: refetchOnboardingStatus, isLoading: isOnboardingStatusLoading } = useQuery({
@@ -312,7 +318,15 @@ export function DashboardShell({
         queryClient.invalidateQueries({ queryKey: ['settings'] })
         // Marca onboarding como completo automaticamente no novo fluxo
         handleMarkOnboardingComplete()
-    }, [refetchHealth, queryClient, handleMarkOnboardingComplete])
+        // Inicia tour guiado se for a primeira vez
+        if (guidedTour.shouldShow) {
+            // Pequeno delay para o banner de sucesso aparecer primeiro
+            setTimeout(() => {
+                setShowSuccessBanner(false)
+                setShowGuidedTour(true)
+            }, 2000)
+        }
+    }, [refetchHealth, queryClient, handleMarkOnboardingComplete, guidedTour.shouldShow])
 
     // Handler para abrir tutorial de como obter credenciais
     const handleHelpClick = useCallback(() => {
@@ -664,6 +678,20 @@ export function DashboardShell({
                     onSuccess={handleCredentialsSuccess}
                     onHelpClick={handleHelpClick}
                 />
+
+                {/* NOVO: Tour guiado pós-conexão (Dashboard-First) */}
+                {showGuidedTour && (
+                    <GuidedTour
+                        onComplete={() => {
+                            setShowGuidedTour(false)
+                            guidedTour.markAsCompleted()
+                        }}
+                        onSkip={() => {
+                            setShowGuidedTour(false)
+                            guidedTour.markAsCompleted()
+                        }}
+                    />
+                )}
 
                 {/* Page Content */}
                 <PageContentShell>

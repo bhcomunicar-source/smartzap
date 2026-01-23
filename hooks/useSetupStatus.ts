@@ -42,20 +42,34 @@ export function useSetupStatus(healthStatus: HealthStatus | null) {
         }
 
         // Verificar se tem campanhas com mensagens enviadas (indica que já usou o sistema)
+        // Usa dashboard stats que já tem totalMessagesSent agregado
         let hasMessages = localFirstMessage;
         if (!hasMessages) {
           try {
-            const res = await fetch('/api/campaigns?limit=1');
+            const res = await fetch('/api/dashboard/stats');
             if (res.ok) {
               const data = await res.json();
-              const campaigns = data.campaigns || data || [];
-              hasMessages = campaigns.some((c: { sent?: number }) => (c.sent || 0) > 0);
+              // Dashboard retorna totalSent como soma de todas as campanhas
+              hasMessages = (data.totalSent || 0) > 0;
               if (hasMessages) {
                 localStorage.setItem(STORAGE_KEY, 'true');
               }
             }
           } catch {
-            // Ignora erro
+            // Fallback: verificar campanhas diretamente (busca mais para ter certeza)
+            try {
+              const res = await fetch('/api/campaigns?limit=50');
+              if (res.ok) {
+                const data = await res.json();
+                const campaigns = data.campaigns || data || [];
+                hasMessages = campaigns.some((c: { sent?: number }) => (c.sent || 0) > 0);
+                if (hasMessages) {
+                  localStorage.setItem(STORAGE_KEY, 'true');
+                }
+              }
+            } catch {
+              // Ignora erro
+            }
           }
         }
 

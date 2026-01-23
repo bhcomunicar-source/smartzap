@@ -31,44 +31,54 @@ interface TokenInputProps
   autoSubmitLength?: number;
   onAutoSubmit?: () => void;
   showCharCount?: boolean;
-  accentColor?: 'emerald' | 'blue' | 'orange' | 'red';
+  accentColor?: 'cyan' | 'magenta' | 'orange' | 'red' | 'emerald';
+  /** Se false, mostra texto claro (para URLs). Default: true */
+  masked?: boolean;
 }
 
-const accentColors = {
-  emerald: {
-    focus: 'focus-within:border-emerald-500 focus-within:shadow-[0_0_0_3px_theme(colors.emerald.500/0.15)]',
-    validating: 'border-emerald-500/50',
-    success: 'border-emerald-500 bg-emerald-500/10',
-    icon: 'text-emerald-500',
+// Cores base do tema Blade Runner
+const accentColorStyles = {
+  cyan: {
+    focus: 'focus-within:border-[var(--br-neon-cyan)] focus-within:shadow-[0_0_15px_var(--br-neon-cyan)/0.3]',
+    validating: 'border-[var(--br-neon-cyan)]/50',
+    success: 'border-[var(--br-neon-cyan)] bg-[var(--br-neon-cyan)]/10',
+    icon: 'text-[var(--br-neon-cyan)]',
   },
-  blue: {
-    focus: 'focus-within:border-blue-500 focus-within:shadow-[0_0_0_3px_theme(colors.blue.500/0.15)]',
-    validating: 'border-blue-500/50',
-    success: 'border-blue-500 bg-blue-500/10',
-    icon: 'text-blue-500',
+  magenta: {
+    focus: 'focus-within:border-[var(--br-neon-magenta)] focus-within:shadow-[0_0_15px_var(--br-neon-magenta)/0.3]',
+    validating: 'border-[var(--br-neon-magenta)]/50',
+    success: 'border-[var(--br-neon-magenta)] bg-[var(--br-neon-magenta)]/10',
+    icon: 'text-[var(--br-neon-magenta)]',
   },
   orange: {
-    focus: 'focus-within:border-orange-500 focus-within:shadow-[0_0_0_3px_theme(colors.orange.500/0.15)]',
-    validating: 'border-orange-500/50',
-    success: 'border-orange-500 bg-orange-500/10',
-    icon: 'text-orange-500',
+    focus: 'focus-within:border-[var(--br-neon-orange)] focus-within:shadow-[0_0_15px_var(--br-neon-orange)/0.3]',
+    validating: 'border-[var(--br-neon-orange)]/50',
+    success: 'border-[var(--br-neon-orange)] bg-[var(--br-neon-orange)]/10',
+    icon: 'text-[var(--br-neon-orange)]',
   },
   red: {
-    focus: 'focus-within:border-red-500 focus-within:shadow-[0_0_0_3px_theme(colors.red.500/0.15)]',
-    validating: 'border-red-500/50',
-    success: 'border-red-500 bg-red-500/10',
-    icon: 'text-red-500',
+    focus: 'focus-within:border-[var(--br-neon-pink)] focus-within:shadow-[0_0_15px_var(--br-neon-pink)/0.3]',
+    validating: 'border-[var(--br-neon-pink)]/50',
+    success: 'border-[var(--br-neon-pink)] bg-[var(--br-neon-pink)]/10',
+    icon: 'text-[var(--br-neon-pink)]',
   },
 };
 
+// Mapeamento de cores antigas para o tema Blade Runner
+const colorMap: Record<string, keyof typeof accentColorStyles> = {
+  cyan: 'cyan',
+  magenta: 'magenta',
+  orange: 'orange',
+  red: 'red',
+  emerald: 'cyan', // emerald → cyan (compatibility)
+};
+
+// Função para obter cores resolvidas
+const getAccentColors = (color: string) => accentColorStyles[colorMap[color] || 'cyan'];
+
 /**
- * Input especializado para tokens com:
- * - Máscara visual (•••••)
- * - Toggle de visibilidade
- * - Detecção de paste com feedback
- * - Auto-submit quando atinge tamanho mínimo
- * - Estados: default, focus, validating, success, error
- * - Shake animation em erro
+ * Input especializado para tokens - Tema Blade Runner.
+ * Terminal-style com glow neon.
  */
 export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
   function TokenInput(
@@ -76,7 +86,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
       value,
       onChange,
       label,
-      placeholder = 'Cole seu token aqui...',
+      placeholder = '> aguardando entrada...',
       validating = false,
       success = false,
       error,
@@ -84,7 +94,8 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
       autoSubmitLength,
       onAutoSubmit,
       showCharCount = true,
-      accentColor = 'emerald',
+      accentColor = 'cyan',
+      masked = true,
       disabled,
       className,
       ...props
@@ -96,7 +107,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
     const internalRef = useRef<HTMLInputElement>(null);
     const inputRef = (ref as React.RefObject<HTMLInputElement>) || internalRef;
 
-    const colors = accentColors[accentColor];
+    const colors = getAccentColors(accentColor);
 
     // Auto-submit quando atingir tamanho
     useEffect(() => {
@@ -126,12 +137,12 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
       <div className={cn('relative', className)}>
         {/* Label */}
         {label && (
-          <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-2">
-            {label}
+          <label className="block text-xs font-mono text-[var(--br-muted-cyan)] mb-2 uppercase tracking-wider">
+            {'> '}{label}
           </label>
         )}
 
-        {/* Input container com shake em erro + pulse sutil quando vazio */}
+        {/* Input container */}
         <motion.div
           animate={
             isError
@@ -141,12 +152,11 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
                 }
               : value.length === 0 && !validating && !success
                 ? {
-                    boxShadow: [
-                      '0 0 0 1px currentColor',
-                      '0 0 0 3px currentColor',
-                      '0 0 0 1px currentColor',
+                    borderColor: [
+                      'rgba(10, 189, 198, 0.2)',
+                      'rgba(10, 189, 198, 0.5)',
+                      'rgba(10, 189, 198, 0.2)',
                     ],
-                    opacity: [0.3, 0.6, 0.3],
                     transition: {
                       duration: 2,
                       repeat: Infinity,
@@ -157,14 +167,14 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
           }
           className={cn(
             'relative flex items-center gap-2',
-            'px-4 py-3 rounded-xl',
-            'bg-[var(--ds-bg-surface)]/50 border',
+            'px-4 py-3 rounded-lg',
+            'bg-[var(--br-void-black)]/80 border',
             'transition-all duration-200',
             // Default state
             !isError &&
               !success &&
               !validating &&
-              'border-[var(--ds-border-default)]',
+              'border-[var(--br-dust-gray)]/50',
             !isError && !success && !validating && colors.focus,
             // Validating
             validating && colors.validating,
@@ -173,12 +183,15 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
             success && colors.success,
             // Error
             isError &&
-              'border-red-500 bg-red-500/10 shadow-[0_0_0_3px_theme(colors.red.500/0.15)]'
+              'border-[var(--br-neon-pink)] bg-[var(--br-neon-pink)]/10 shadow-[0_0_15px_var(--br-neon-pink)/0.3]'
           )}
         >
+          {/* Terminal prompt */}
+          <span className="text-[var(--br-neon-cyan)] font-mono text-sm">{'>'}</span>
+
           <input
             ref={inputRef}
-            type={showValue ? 'text' : 'password'}
+            type={!masked || showValue ? 'text' : 'password'}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onPaste={handlePaste}
@@ -186,12 +199,17 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
             disabled={isDisabled}
             className={cn(
               'flex-1 bg-transparent outline-none',
-              'text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-muted)]',
+              'text-[var(--br-hologram-white)] placeholder:text-[var(--br-dust-gray)]',
               'font-mono text-sm',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
             {...props}
           />
+
+          {/* Cursor blink when empty */}
+          {value.length === 0 && !validating && !success && (
+            <span className="br-cursor text-[var(--br-neon-cyan)] font-mono">_</span>
+          )}
 
           {/* Status icons */}
           <AnimatePresence mode="wait">
@@ -224,15 +242,15 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
               >
-                <X className="w-5 h-5 text-red-500" />
+                <X className="w-5 h-5 text-[var(--br-neon-pink)]" />
               </motion.div>
             )}
-            {!validating && !success && !isError && value.length > 0 && (
+            {masked && !validating && !success && !isError && value.length > 0 && (
               <motion.button
                 key="toggle"
                 type="button"
                 onClick={() => setShowValue(!showValue)}
-                className="text-[var(--ds-text-muted)] hover:text-[var(--ds-text-secondary)] transition-colors p-1"
+                className="text-[var(--br-dust-gray)] hover:text-[var(--br-muted-cyan)] transition-colors p-1"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -256,12 +274,12 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0 }}
                 className={cn(
-                  'flex items-center gap-1 text-xs',
+                  'flex items-center gap-1 text-xs font-mono',
                   colors.icon
                 )}
               >
                 <ClipboardPaste className="w-3 h-3" />
-                Token colado!
+                dados recebidos
               </motion.div>
             )}
           </AnimatePresence>
@@ -273,9 +291,9 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
-                className="text-xs text-red-400"
+                className="text-xs font-mono text-[var(--br-neon-pink)]"
               >
-                {error}
+                {'! '}{error}
               </motion.p>
             )}
           </AnimatePresence>
@@ -289,13 +307,13 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className={cn(
-                'text-xs',
+                'text-xs font-mono',
                 value.length >= minLength
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-[var(--ds-text-muted)]'
+                  ? 'text-[var(--br-neon-cyan)]'
+                  : 'text-[var(--br-dust-gray)]'
               )}
             >
-              {value.length}/{minLength}+
+              [{value.length}/{minLength}+]
             </motion.span>
           )}
         </div>

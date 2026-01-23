@@ -191,20 +191,6 @@ export function OnboardingModal({ isConnected, onSaveCredentials, onMarkComplete
             <DialogDescription>Tutorial de configuração</DialogDescription>
           </DialogHeader>
 
-          {/* Botão de teste direto */}
-          <div className="mb-4 p-4 bg-red-500/20 rounded">
-            <button
-              onClick={() => {
-                console.log('[Tutorial] Botão TESTE clicado!');
-                alert('Clicou!');
-                handleTutorialClose();
-              }}
-              className="px-4 py-2 bg-red-500 text-white rounded"
-            >
-              BOTÃO TESTE - CLIQUE AQUI
-            </button>
-          </div>
-
           {renderTutorialStep(forceStep, handleTutorialClose)}
         </DialogContent>
       </Dialog>

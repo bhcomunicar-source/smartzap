@@ -143,10 +143,10 @@ export default function InstallPage() {
   if (isCollecting(state)) {
     const { step, data, direction } = state; // ✅ Tudo vem do state agora
 
-    const glowColors: Record<InstallStep, 'emerald' | 'blue' | 'orange' | 'red'> = {
-      1: 'emerald',
-      2: 'blue',
-      3: 'emerald',
+    const glowColors: Record<InstallStep, 'cyan' | 'magenta' | 'orange' | 'red'> = {
+      1: 'cyan',
+      2: 'magenta',
+      3: 'cyan',
       4: 'orange',
       5: 'red',
     };

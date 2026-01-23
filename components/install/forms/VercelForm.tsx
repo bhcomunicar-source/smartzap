@@ -9,13 +9,8 @@ import { VALIDATION } from '@/lib/installer/types';
 import type { FormProps } from './types';
 
 /**
- * Form de token Vercel com comportamento MÁGICO.
- *
- * Fluxo:
- * 1. Usuário cola o token
- * 2. Após 24+ chars, aguarda 800ms
- * 3. Valida automaticamente via API
- * 4. Mostra checkmark e auto-avança
+ * Form de token Vercel - Tema Blade Runner.
+ * "Estabelecer Link Neural" - conexão com servidor de deploy.
  */
 export function VercelForm({ data, onComplete, onBack, showBack }: FormProps) {
   const [token, setToken] = useState(data.vercelToken);
@@ -26,7 +21,7 @@ export function VercelForm({ data, onComplete, onBack, showBack }: FormProps) {
 
   const handleValidate = async () => {
     if (token.trim().length < VALIDATION.VERCEL_TOKEN_MIN_LENGTH) {
-      setError('Token muito curto');
+      setError('Credenciais insuficientes');
       return;
     }
 
@@ -46,13 +41,14 @@ export function VercelForm({ data, onComplete, onBack, showBack }: FormProps) {
       const result = await res.json();
 
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Token inválido');
+        throw new Error(result.error || 'Credenciais inválidas');
       }
 
-      setProjectName(result.project?.name || 'Projeto encontrado');
+      setProjectName(result.project?.name || 'Link estabelecido');
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao validar token');
+      setError(err instanceof Error ? err.message : 'Falha na conexão');
+      setToken('');
     } finally {
       setValidating(false);
     }
@@ -62,11 +58,10 @@ export function VercelForm({ data, onComplete, onBack, showBack }: FormProps) {
     onComplete({ vercelToken: token.trim() });
   };
 
-  // Estado de sucesso - mostra checkmark e auto-avança
   if (success) {
     return (
       <SuccessCheckmark
-        message={projectName ? `Projeto "${projectName}" encontrado!` : 'Token validado!'}
+        message={projectName ? `Projeto "${projectName}" localizado` : 'Link neural estabelecido'}
         onComplete={handleSuccessComplete}
       />
     );
@@ -76,61 +71,67 @@ export function VercelForm({ data, onComplete, onBack, showBack }: FormProps) {
     <div className="relative space-y-5">
       <ValidatingOverlay
         isVisible={validating}
-        message="Verificando token..."
-        subMessage="Procurando seu projeto na Vercel"
+        message="Executando Voight-Kampff..."
+        subMessage="Verificando autenticidade"
       />
 
       {/* Header */}
       <div className="flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center">
+        <div className="w-14 h-14 rounded-full bg-[var(--br-deep-navy)] border border-[var(--br-neon-magenta)]/30 flex items-center justify-center">
           <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L2 19.5h20L12 2z" className="text-zinc-100" />
+            <path d="M12 2L2 19.5h20L12 2z" className="text-[var(--br-neon-magenta)]" />
           </svg>
         </div>
-        <h2 className="mt-4 text-xl font-semibold text-zinc-100">Conecte sua conta Vercel</h2>
-        <p className="mt-1 text-sm text-zinc-400">Cole seu token de acesso</p>
+        <h2 className="mt-4 text-xl font-bold tracking-wide text-[var(--br-hologram-white)] uppercase">
+          Estabelecer Link Neural
+        </h2>
+        <p className="mt-1 text-sm text-[var(--br-muted-cyan)] font-mono">
+          Conexão com servidor de deploy
+        </p>
       </div>
 
-      {/* Token Input Mágico */}
+      {/* Token Input */}
       <TokenInput
         value={token}
-        onChange={setToken}
-        placeholder="Cole seu token aqui..."
+        onChange={(val) => {
+          setToken(val);
+          setError(null);
+        }}
+        placeholder="cole as credenciais aqui..."
         validating={validating}
         error={error || undefined}
         minLength={VALIDATION.VERCEL_TOKEN_MIN_LENGTH}
         autoSubmitLength={VALIDATION.VERCEL_TOKEN_MIN_LENGTH}
         onAutoSubmit={handleValidate}
         showCharCount={false}
-        accentColor="blue"
+        accentColor="magenta"
         autoFocus
       />
 
       {/* Collapsible help */}
       <details className="w-full group">
-        <summary className="flex items-center justify-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 cursor-pointer list-none transition-colors">
+        <summary className="flex items-center justify-center gap-1.5 text-sm font-mono text-[var(--br-dust-gray)] hover:text-[var(--br-muted-cyan)] cursor-pointer list-none transition-colors">
           <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
-          Como criar o token?
+          como obter credenciais?
         </summary>
-        <div className="mt-3 p-3 rounded-lg bg-zinc-800/50 text-left space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-          <ol className="text-xs text-zinc-400 space-y-1.5 list-decimal list-inside">
+        <div className="mt-3 p-3 rounded-lg bg-[var(--br-void-black)]/50 border border-[var(--br-dust-gray)]/30 text-left space-y-2">
+          <ol className="text-xs font-mono text-[var(--br-muted-cyan)] space-y-1.5 list-decimal list-inside">
             <li>
               Acesse{' '}
-              <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+              <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-[var(--br-neon-magenta)] hover:underline">
                 vercel.com/account/tokens
               </a>
             </li>
             <li>
-              Clique em <strong className="text-zinc-300">Create</strong>
+              Clique em <strong className="text-[var(--br-hologram-white)]">Create</strong>
             </li>
             <li>
-              Nome: <strong className="text-zinc-300">smartzap</strong> • Scope: <strong className="text-zinc-300">Full Account</strong>
+              Nome: <strong className="text-[var(--br-hologram-white)]">smartzap</strong> • Scope: <strong className="text-[var(--br-hologram-white)]">Full Account</strong>
             </li>
-            <li>Copie e cole o token acima</li>
+            <li>Copie e cole as credenciais acima</li>
           </ol>
         </div>
       </details>
-
     </div>
   );
 }

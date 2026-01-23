@@ -11,12 +11,8 @@ interface StepDotsProps {
 }
 
 /**
- * Indicador de progresso com dots animados.
- *
- * Estados:
- * - Pendente: zinc-700, escala 1x
- * - Atual: emerald-500, escala 1.3x com pulse ring
- * - Completado: emerald-500/50, escala 1x
+ * Indicador de progresso estilo Blade Runner.
+ * Dots com glow neon cyan.
  */
 export function StepDots({
   current,
@@ -45,10 +41,10 @@ export function StepDots({
             {/* Pulse ring para step ativo */}
             {isActive && (
               <motion.div
-                className="absolute inset-0 rounded-full bg-emerald-500"
+                className="absolute inset-0 rounded-full bg-[var(--br-neon-cyan)]"
                 initial={{ scale: 1, opacity: 0.5 }}
                 animate={{
-                  scale: [1, 2, 1],
+                  scale: [1, 2.5, 1],
                   opacity: [0.5, 0, 0.5],
                 }}
                 transition={{
@@ -63,9 +59,9 @@ export function StepDots({
             <motion.div
               className={cn(
                 'w-2.5 h-2.5 rounded-full transition-colors duration-300 relative z-10',
-                isActive && 'bg-emerald-500',
-                isCompleted && !isActive && 'bg-emerald-500/50',
-                !isActive && !isCompleted && 'bg-neutral-300 dark:bg-zinc-700'
+                isActive && 'bg-[var(--br-neon-cyan)] shadow-[0_0_8px_var(--br-neon-cyan)]',
+                isCompleted && !isActive && 'bg-[var(--br-neon-cyan)]/50',
+                !isActive && !isCompleted && 'bg-[var(--br-dust-gray)]'
               )}
               initial={false}
             />

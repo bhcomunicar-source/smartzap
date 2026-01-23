@@ -45,8 +45,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log(`[ai-generate] Processing request for conversation ${body.conversation.id}`)
-    console.log(`[ai-generate] Agent: ${body.agent.name}, Messages: ${body.messages.length}`)
+    console.log(`[ai-generate] Processing: conversation=${body.conversation.id}, agent=${body.agent.name}, messages=${body.messages.length}`)
 
     // Processa com o chat agent
     const result: SupportAgentResult = await processChatAgent(body)
