@@ -185,6 +185,7 @@ export async function processInboxAIWorkflow(context: WorkflowContext) {
   const aiApiUrl = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/api/internal/ai-generate`
   const apiKey = process.env.SMARTZAP_API_KEY || ''
   console.log(`[inbox-ai-workflow] Calling AI API: ${aiApiUrl}`)
+  console.log(`[inbox-ai-workflow] Payload: agent=${agent.name}, messages=${messages.length}, apiKey=${apiKey ? 'present' : 'MISSING'}`)
 
   const aiCallResult = await context.call<SupportAgentResult>('process-ai', {
     url: aiApiUrl,
