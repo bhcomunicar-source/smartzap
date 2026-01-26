@@ -1120,14 +1120,18 @@ export default function CampaignsNewRealPage() {
     audienceMode === 'todos' ? baseCount : audienceMode === 'segmentos' ? segmentEstimate : selectedTestCount
   const isSegmentCountLoading = audienceMode === 'segmentos' && segmentCountQuery.isFetching
   const formatCurrency = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`
-  const formattedAudienceCount = audienceMode === 'teste' ? selectedTestCount : audienceCount
+
+  // Quando skipIgnored=true, usar apenas os contatos válidos do precheck
+  const effectiveAudienceCount = skipIgnored && precheckTotals ? precheckTotals.valid : audienceCount
+  const formattedAudienceCount = audienceMode === 'teste' ? selectedTestCount : effectiveAudienceCount
   const displayAudienceCount = isSegmentCountLoading ? 'Calculando...' : String(formattedAudienceCount)
+
   const hasPricing = Boolean(selectedTemplate?.category) && hasRate
   const basePricePerMessage = hasPricing
     ? getPricingBreakdown(selectedTemplate!.category, 1, 0, exchangeRate!).pricePerMessageBRLFormatted
     : 'R$ --'
   const audiencePricing = hasPricing
-    ? getPricingBreakdown(selectedTemplate!.category, audienceCount, 0, exchangeRate!)
+    ? getPricingBreakdown(selectedTemplate!.category, effectiveAudienceCount, 0, exchangeRate!)
     : null
   const audienceCostFormatted = hasPricing ? audiencePricing!.totalBRLFormatted : 'R$ --'
   const displayAudienceCost = isSegmentCountLoading ? '—' : audienceCostFormatted
@@ -1142,7 +1146,7 @@ export default function CampaignsNewRealPage() {
         ? `${selectedTestCount || 0} contato${selectedTestCount === 1 ? '' : 's'} de teste`
         : isSegmentCountLoading
           ? 'Calculando estimativa...'
-          : `${audienceCount} contatos • ${audienceCostFormatted}`
+          : `${effectiveAudienceCount} contatos • ${audienceCostFormatted}`
   const activeTemplate = previewTemplate ?? (templateSelected ? selectedTemplate : null)
 
   const parameterFormat = (
@@ -3023,7 +3027,7 @@ export default function CampaignsNewRealPage() {
                       ? `${selectedTestCount || 0} contato(s) de teste`
                       : isSegmentCountLoading
                         ? 'Calculando...'
-                        : `${audienceCount} contatos`}
+                        : `${effectiveAudienceCount} contatos`}
                   </span>
                 </div>
               )}
