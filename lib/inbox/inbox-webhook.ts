@@ -337,15 +337,17 @@ async function dispatchToQStash(
   const qstash = getQStashClient()
   if (!qstash) return false
 
-  // URL do endpoint
-  // IMPORTANTE: Usa domínio fixo como fallback garantido para evitar URLs de preview
+  // URL do endpoint - prioridade para variáveis de produção da Vercel
+  // DEBUG: Log para verificar quais variáveis estão disponíveis
+  console.log(`🔍 [URL-DEBUG] NEXT_PUBLIC_APP_URL=${process.env.NEXT_PUBLIC_APP_URL}`)
+  console.log(`🔍 [URL-DEBUG] VERCEL_PROJECT_PRODUCTION_URL=${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+  console.log(`🔍 [URL-DEBUG] VERCEL_URL=${process.env.VERCEL_URL}`)
+  console.log(`🔍 [URL-DEBUG] VERCEL_ENV=${process.env.VERCEL_ENV}`)
+
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL &&
       `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) ||
-    (process.env.VERCEL_ENV === 'production'
-      ? 'https://smartzap.escoladeautomacao.com.br'
-      : null) ||
     (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`) ||
     'http://localhost:3000'
 
