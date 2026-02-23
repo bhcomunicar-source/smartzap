@@ -167,21 +167,21 @@ function LoginForm() {
       <p className="text-center text-[var(--ds-text-muted)] text-sm mt-6">
         SmartZap © {new Date().getFullYear()} |{' '}
         <a
-          href="https://www.escoladeautomacao.com.br/"
+          href="https://https:yastech.lovable.app/"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-emerald-500 transition-colors"
         >
-          Escola de Automação
+          Yastech
         </a>
         {' '}| by{' '}
         <a
-          href="https://instagram.com/thaleslaray"
+          href="https://instagram.com/soukleberpereira"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-emerald-500 transition-colors"
         >
-          @thaleslaray
+          @soukleberpereira
         </a>
       </p>
     </div>
